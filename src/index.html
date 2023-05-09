@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <!--
+    Robin Steuber
+    2023-05-09
+  -->
+  <title>Spiff - SpaceTraders Client</title>
+  <link rel="icon" type="image/x-icon" href="/img/logo.svg">
+  <style type="text/css">
+    body {
+      margin: 0;
+      background-color: #171717;
+      color: white;
+      font-size: large;
+    }
+    input {
+      background-color: #171717;
+      color: white;
+    }
+    a {
+      color: #C2C2EA;
+    }
+    h1 {
+      margin-bottom: 1rem;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+    }
+    #top_bar {
+      flex: 0 3.2rem;
+      height: 3.2rem;
+      background-color: #BA1717;
+      padding: 0.4rem;
+
+      display: flex;
+      flex-direction: row;
+    }
+    #top_bar > * {
+      height: 100%;
+      border-radius: 0.5rem;
+    }
+    #page_container {
+      flex: 1;
+    }
+    .page {
+      padding-top: 0;
+      padding-left: 0.4rem;
+      padding-right: 0.4rem;
+      padding-bottom: 5rem;
+    }
+    .page:not(.active_page) {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="top_bar">
+    <img id="bar_logo" src="img/logo.svg" height="100%" alt="Spiff Spaceship Logo">
+  </div>
+  <div id="page_container">
+    <div class="page active_page" id="agent_management_page">
+      <h1>Agents</h1>
+    </div>
+    <div class="page">
+      <h1>Some Other Page</h1>
+    </div>
+  </div>
+</body>
+</html>
