@@ -1,5 +1,5 @@
 # spiff
-My own interface for playing SpaceTraders https://spacetraders.io/
+My own interface for playing [SpaceTraders](https://spacetraders.io/).
 
 I don't currently have the interface hosted anywhere.
 
