@@ -8,11 +8,15 @@ const k_popup_button_box_spacer_class = "popup_button_box_spacer"
 export const k_closed_by_overlay = "popup_closed_by_overlay";
 let g_overlay_handler = null;
 
+export const k_closed_by_escape_key = "popup_closed_by_escape_key";
+let g_document_keydown_handler = null;
+
 export function show_raw(...elements) {
   let popup = document.getElementById("popup");
 
   popup.replaceChildren(...elements);
   document.body.classList.remove(k_hide_popup_class);
+  document.activeElement.blur();
 }
 
 export function hide() {
@@ -22,6 +26,10 @@ export function hide() {
     let overlay = document.getElementById("popup_container");
     overlay.removeEventListener("click", g_overlay_handler);
     g_overlay_handler = null;
+  }
+  if (g_document_keydown_handler) {
+    document.removeEventListener("keydown", g_document_keydown_handler);
+    g_document_keydown_handler = null;
   }
   document.body.classList.add(k_hide_popup_class);
   popup.replaceChildren();
@@ -49,7 +57,17 @@ const k_button_properties = {
   },
 };
 
-export async function show(title, message, {buttons, allow_non_button_close} = {}) {
+export async function show(title,
+                           message,
+                           {
+                            buttons,
+                            allow_non_button_close,
+                            button_activated_by_enter_key
+                           } = {}) {
+  if (!document.body.classList.contains(k_hide_popup_class)) {
+    throw new Error("Attempted to show popup when popup is already shown");
+  }
+
   return new Promise(resolve => {
     let title_el = document.createElement("h1");
     title_el.classList.add(k_popup_title_class);
@@ -86,11 +104,31 @@ export async function show(title, message, {buttons, allow_non_button_close} = {
 
     if (allow_non_button_close) {
       let overlay = document.getElementById("popup_container");
-      g_overlay_handler = () => {
-        hide();
-        resolve(k_closed_by_overlay);
+      g_overlay_handler = event => {
+        event = event || windows.event;
+        if (event.target == overlay) {
+          hide();
+          resolve(k_closed_by_overlay);
+          event.stopPropagation();
+        }
       };
       overlay.addEventListener("click", g_overlay_handler);
+    }
+
+    if (allow_non_button_close || button_activated_by_enter_key) {
+      g_document_keydown_handler = event => {
+        event = event || windows.event;
+        if (event.key == "Escape" && allow_non_button_close) {
+          hide();
+          resolve(k_closed_by_escape_key);
+          event.stopPropagation();
+        } else if (event.key == "Enter" && button_activated_by_enter_key) {
+          hide();
+          resolve(button_activated_by_enter_key);
+          event.stopPropagation();
+        }
+      };
+      document.addEventListener("keydown", g_document_keydown_handler);
     }
 
     show_raw(title_el, message_el, button_box);

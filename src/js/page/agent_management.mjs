@@ -13,23 +13,25 @@ export function init() {
 }
 
 async function add_agent(token) {
-  let result = await m_popup.show(
+  await m_popup.show(
     "Unimplemented Error",
     "Oops, I haven't implemented this functionality yet",
     {
       buttons: [m_popup.e_button.ok],
       allow_non_button_close: true,
+      button_activated_by_enter_key: m_popup.e_button.ok,
     }
   );
 }
 
 async function create_agent(call_sign) {
-  let result = await m_popup.show(
+  await m_popup.show(
     "Unimplemented Error",
     "Oops, I haven't implemented this functionality yet",
     {
       buttons: [m_popup.e_button.ok],
       allow_non_button_close: true,
+      button_activated_by_enter_key: m_popup.e_button.ok,
     }
   );
 }

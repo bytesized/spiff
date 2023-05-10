@@ -14,8 +14,9 @@ export function init() {
     }
     input.addEventListener("keydown", event => {
       event = event || window.event;
-      if (event.keyCode == 13) {
+      if (event.key == "Enter") {
         button.click();
+        event.stopPropagation();
       }
     });
   }
