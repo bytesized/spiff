@@ -1,13 +1,15 @@
 #top_bar {
   flex: 0 3.2rem;
   height: 3.2rem;
-  background-color: #BA1717;
+  background-color: var(--accent_color);
   padding: 0.4rem;
-
-  display: flex;
-  flex-direction: row;
 }
+
 #top_bar > * {
   height: 100%;
   border-radius: 0.5rem;
+}
+
+#bar_logo {
+  flex: 0;
 }

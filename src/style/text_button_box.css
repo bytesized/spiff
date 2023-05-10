@@ -1,0 +1,36 @@
+.text_button_box {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 45rem;
+  max-width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.text_button_box > input[type="text"] {
+  flex: 1;
+  appearance: none;
+  border-width: 2px;
+  border-right-width: 0;
+  border-style: solid;
+  border-color: white;
+  border-bottom-left-radius: 0.5rem;
+  border-top-left-radius: 0.5rem;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  padding-left: 0.75rem;
+  background-color: var(--background_color);
+}
+
+.text_button_box > button {
+  appearance: none;
+  width: 10rem;
+  border-width: 2px;
+  border-left-width: 0;
+  border-style: solid;
+  border-color: white;
+  border-bottom-left-radius: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0.5rem;
+  border-bottom-right-radius: 0.5rem;
+}

@@ -11,9 +11,11 @@
   <link rel="stylesheet" href="style/general.css" />
   <link rel="stylesheet" href="style/top_bar.css" />
   <link rel="stylesheet" href="style/page.css" />
+  <link rel="stylesheet" href="style/dir_box.css" />
+  <link rel="stylesheet" href="style/text_button_box.css" />
 </head>
-<body>
-  <div id="top_bar">
+<body class="vbox">
+  <div id="top_bar" class="hbox">
     <img id="bar_logo" src="img/logo.svg" height="100%" alt="Spiff Spaceship Logo">
   </div>
   <div id="page_container">
@@ -21,6 +23,15 @@
       <h1>Agents</h1>
       <ul id="agent_list">
       </ul>
+      <h2>Add New Agent</h2>
+      <div class="text_button_box">
+        <input type="text" id="new_agent_input" placeholder="Token" />
+        <button id="new_agent_button">Add Agent</button>
+      </div>
+      <div class="text_button_box">
+        <input type="text" id="create_agent_input" placeholder="Call Sign" />
+        <button id="create_agent_button">Create Agent</button>
+      </div>
     </div>
     <div class="page">
       <h1>Some Other Page</h1>
