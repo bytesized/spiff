@@ -1,0 +1,69 @@
+/*
+ * Popup usage of z-indicies:
+ * z-indicies 100 through 199 are reserved for this popup.
+ * The under-popup overlay (#under_popup_overlay) is z-index 100
+ * The base of the popup (#popup_container) is z-index 101
+ */
+
+#under_popup_overlay {
+  z-index: 100;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+	background-color: black;
+	opacity: 0.9;
+}
+
+.popup_hidden #under_popup_overlay {
+  display: none;
+}
+
+#popup_container {
+  z-index: 101;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.popup_hidden #popup_container {
+  display: none;
+}
+
+#popup {
+  background-color: var(--background_color);
+  opacity: 1;
+  border-style: solid;
+  border-width: 0.1rem;
+  border-color: var(--border_color);
+  border-radius: 3rem;
+  padding: 2rem;
+  width: 45rem;
+  max-width: 100%;
+}
+
+.popup_title {
+  margin-top: 0;
+}
+
+.popup_message {
+}
+
+.popup_button_box {
+  display: flex;
+  flex-direction: row;
+}
+
+.popup_button {
+  flex: 0;
+}
+
+.popup_button_box_spacer {
+  flex: 1;
+}

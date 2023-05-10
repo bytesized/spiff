@@ -8,34 +8,62 @@
   -->
   <title>Spiff - SpaceTraders Client</title>
   <link rel="icon" type="image/x-icon" href="/img/logo.svg" />
+
+  <!--
+    General usage of z-indicies:
+    The pages themselves are z-index=1
+    z-indicies 2 through 99 are reserved for page contents.
+    z-indicies 100 through 199 are reserved for the popup.
+
+    More specific z-index information is in the CSS files for the specific pages and for the popup.
+  -->
+
   <link rel="stylesheet" href="style/general.css" />
   <link rel="stylesheet" href="style/top_bar.css" />
   <link rel="stylesheet" href="style/page.css" />
   <link rel="stylesheet" href="style/dir_box.css" />
   <link rel="stylesheet" href="style/text_button_box.css" />
+  <link rel="stylesheet" href="style/popup.css" />
+
+  <script type="module">
+    import * as m_text_button_box from "./js/text_button_box.mjs";
+    import * as m_agent_management from "./js/page/agent_management.mjs";
+
+    window.addEventListener("DOMContentLoaded", () => {
+      m_text_button_box.init();
+      m_agent_management.init();
+    });
+  </script>
 </head>
-<body class="vbox">
-  <div id="top_bar" class="hbox">
-    <img id="bar_logo" src="img/logo.svg" height="100%" alt="Spiff Spaceship Logo">
+<body class="popup_hidden">
+  <div class="vbox">
+    <div id="top_bar" class="hbox">
+      <img id="bar_logo" src="img/logo.svg" height="100%" alt="Spiff Spaceship Logo">
+    </div>
+    <div id="page_container">
+      <div class="page active_page" id="agent_management_page">
+        <h1>Agents</h1>
+        <ul id="agent_list">
+        </ul>
+        <h2>Add New Agent</h2>
+        <div class="text_button_box">
+          <input type="text" id="new_agent_input" placeholder="Token" />
+          <button id="new_agent_button">Add Agent</button>
+        </div>
+        <div class="text_button_box">
+          <input type="text" id="create_agent_input" placeholder="Call Sign" />
+          <button id="create_agent_button">Create Agent</button>
+        </div>
+      </div>
+      <div class="page">
+        <h1>Some Other Page</h1>
+      </div>
+    </div>
   </div>
-  <div id="page_container">
-    <div class="page active_page" id="agent_management_page">
-      <h1>Agents</h1>
-      <ul id="agent_list">
-      </ul>
-      <h2>Add New Agent</h2>
-      <div class="text_button_box">
-        <input type="text" id="new_agent_input" placeholder="Token" />
-        <button id="new_agent_button">Add Agent</button>
-      </div>
-      <div class="text_button_box">
-        <input type="text" id="create_agent_input" placeholder="Call Sign" />
-        <button id="create_agent_button">Create Agent</button>
-      </div>
-    </div>
-    <div class="page">
-      <h1>Some Other Page</h1>
-    </div>
+  <div id="under_popup_overlay">
+  </div>
+  <div id="popup_container">
+    <div id="popup"></div>
   </div>
 </body>
 </html>

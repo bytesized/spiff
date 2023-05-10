@@ -1,6 +1,7 @@
 :root {
   --background_color: #171717;
   --accent_color: #BA1717;
+  --border_color: white;
 }
 
 body {
@@ -8,6 +9,11 @@ body {
   background-color: var(--background_color);
   color: white;
   font-size: large;
+}
+
+body > div {
+  width: 100%;
+  height: 100%;
 }
 
 input {

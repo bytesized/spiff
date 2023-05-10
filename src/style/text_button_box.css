@@ -10,10 +10,10 @@
 .text_button_box > input[type="text"] {
   flex: 1;
   appearance: none;
-  border-width: 2px;
+  border-width: 0.1rem;
   border-right-width: 0;
   border-style: solid;
-  border-color: white;
+  border-color: var(--border_color);
   border-bottom-left-radius: 0.5rem;
   border-top-left-radius: 0.5rem;
   border-top-right-radius: 0;
@@ -25,10 +25,10 @@
 .text_button_box > button {
   appearance: none;
   width: 10rem;
-  border-width: 2px;
+  border-width: 0.1rem;
   border-left-width: 0;
   border-style: solid;
-  border-color: white;
+  border-color: var(--border_color);
   border-bottom-left-radius: 0;
   border-top-left-radius: 0;
   border-top-right-radius: 0.5rem;
