@@ -18,11 +18,11 @@
 
   <script type="module">
     import * as m_text_button_box from "./js/text_button_box.mjs";
-    import * as m_agent_management from "./js/page/agent_management.mjs";
+    import * as m_agent_selection from "./js/page/agent_selection.mjs";
 
     window.addEventListener("DOMContentLoaded", () => {
       m_text_button_box.init();
-      m_agent_management.init();
+      m_agent_selection.init();
     });
   </script>
 </head>
@@ -32,8 +32,8 @@
       <img id="bar_logo" src="img/logo.svg" height="100%" alt="Spiff Spaceship Logo">
     </div>
     <div id="page_container">
-      <div class="page active_page" id="agent_management_page">
-        <h1>Agents</h1>
+      <div class="page active_page">
+        <h1>Select an Agent</h1>
         <ul id="agent_list">
         </ul>
         <h2>Add New Agent</h2>
