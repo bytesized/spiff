@@ -1,18 +1,12 @@
 import * as m_popup from "../popup.mjs";
+import * as m_text_button_box from "../text_button_box.mjs";
 
 export function init() {
-  document.getElementById("new_agent_button").addEventListener("click", async () => {
-    let token = document.getElementById("new_agent_input").value;
-    await add_agent(token);
-  });
-
-  document.getElementById("create_agent_button").addEventListener("click", async () => {
-    let call_sign = document.getElementById("create_agent_input").value;
-    await create_agent(call_sign);
-  });
+  m_text_button_box.connect_handler("add_agent_tbb", add_agent);
+  m_text_button_box.connect_handler("create_agent_tbb", create_agent);
 }
 
-async function add_agent(token) {
+async function add_agent(box) {
   await m_popup.show(
     "Unimplemented Error",
     "Oops, I haven't implemented this functionality yet",
@@ -24,7 +18,7 @@ async function add_agent(token) {
   );
 }
 
-async function create_agent(call_sign) {
+async function create_agent(box) {
   await m_popup.show(
     "Unimplemented Error",
     "Oops, I haven't implemented this functionality yet",

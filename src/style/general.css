@@ -1,7 +1,8 @@
 :root {
   --background_color: #171717;
   --accent_color: #BA1717;
-  --border_color: white;
+  --subtle_accent_color: #353535;
+  --border_color: #909090;
 }
 
 body {

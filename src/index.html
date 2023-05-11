@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="style/dir_box.css" />
   <link rel="stylesheet" href="style/text_button_box.css" />
   <link rel="stylesheet" href="style/popup.css" />
+  <link rel="stylesheet" href="style/busy_spinner.css" />
 
   <script type="module">
     import * as m_text_button_box from "./js/text_button_box.mjs";
@@ -36,13 +37,13 @@
         <ul id="agent_list">
         </ul>
         <h2>Add New Agent</h2>
-        <div class="text_button_box">
-          <input type="text" id="new_agent_input" placeholder="Token" />
-          <button id="new_agent_button">Add Agent</button>
+        <div id="add_agent_tbb" class="text_button_box">
+          <input type="text" placeholder="Token" />
+          <button>Add Agent</button>
         </div>
-        <div class="text_button_box">
-          <input type="text" id="create_agent_input" placeholder="Call Sign" />
-          <button id="create_agent_button">Create Agent</button>
+        <div id="create_agent_tbb" class="text_button_box">
+          <input type="text" placeholder="Call Sign" />
+          <button>Create Agent</button>
         </div>
       </div>
       <div class="page">
