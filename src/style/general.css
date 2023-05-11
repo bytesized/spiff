@@ -3,12 +3,13 @@
   --accent_color: #BA1717;
   --subtle_accent_color: #353535;
   --border_color: #909090;
+  --text_color: white;
 }
 
 body {
   margin: 0;
   background-color: var(--background_color);
-  color: white;
+  color: var(--text_color);
   font-size: large;
 }
 
@@ -19,7 +20,7 @@ body > div {
 
 input {
   background-color: var(--background_color);
-  color: white;
+  color: var(--text_color);
   outline: none;
   line-height: 2rem;
   font-size: 1.5rem;
@@ -32,7 +33,7 @@ h1 {
 button {
   cursor: pointer;
   display: inline-block;
-  color: white;
+  color: var(--text_color);
   background-color: var(--accent_color);
   border-width: 0;
   padding: 0.5rem 1rem;
