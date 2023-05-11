@@ -1,38 +1,16 @@
-/*
- * Popup usage of z-indicies:
- * z-indicies 100 through 199 are reserved for this popup.
- * The under-popup overlay (#under_popup_overlay) is z-index 100
- * The base of the popup (#popup_container) is z-index 101
- */
-
 #under_popup_overlay {
-  z-index: 100;
   position: fixed;
   top: 0;
   bottom: 0;
   left: 0;
   right: 0;
-	background-color: black;
-	opacity: 0.9;
-}
-
-.popup_hidden #under_popup_overlay {
-  display: none;
-}
-
-#popup_container {
-  z-index: 101;
-  position: fixed;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  background-color: rgba(0, 0, 0, 0.9);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.popup_hidden #popup_container {
+.popup_hidden #under_popup_overlay {
   display: none;
 }
 

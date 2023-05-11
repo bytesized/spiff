@@ -3,7 +3,8 @@ const k_popup_title_class = "popup_title";
 const k_popup_message_class = "popup_message";
 const k_popup_button_box_class = "popup_button_box";
 const k_popup_button_class = "popup_button";
-const k_popup_button_box_spacer_class = "popup_button_box_spacer"
+const k_popup_button_box_spacer_class = "popup_button_box_spacer";
+const k_popup_overlay_id = "under_popup_overlay";
 
 export const k_closed_by_overlay = "popup_closed_by_overlay";
 let g_overlay_handler = null;
@@ -23,7 +24,7 @@ export function hide() {
   let popup = document.getElementById("popup");
 
   if (g_overlay_handler) {
-    let overlay = document.getElementById("popup_container");
+    let overlay = document.getElementById(k_popup_overlay_id);
     overlay.removeEventListener("click", g_overlay_handler);
     g_overlay_handler = null;
   }
@@ -103,7 +104,7 @@ export async function show(title,
     }
 
     if (allow_non_button_close) {
-      let overlay = document.getElementById("popup_container");
+      let overlay = document.getElementById(k_popup_overlay_id);
       g_overlay_handler = event => {
         event = event || windows.event;
         if (event.target == overlay) {
