@@ -14,6 +14,7 @@ export function init() {
 }
 
 async function add_agent(box) {
+  // TODO: Implement this
   await m_popup.show(
     "Unimplemented Error",
     "Oops, I haven't implemented agent adding functionality yet",
@@ -26,6 +27,7 @@ async function add_agent(box) {
 }
 
 async function create_agent(box) {
+  // TODO: Implement this
   await m_popup.show(
     "Unimplemented Error",
     "Oops, I haven't implemented agent creation functionality yet",
@@ -62,6 +64,7 @@ function refresh_list() {
 }
 
 async function select_agent(clicked) {
+  // TODO: Implement this
   let call_sign = m_agent.get_cached_agent_data(clicked.id).call_sign;
   await m_popup.show(
     "Unimplemented Error",
@@ -75,6 +78,7 @@ async function select_agent(clicked) {
 }
 
 async function remove_agent(clicked) {
+  // TODO: Implement this
   let call_sign = m_agent.get_cached_agent_data(clicked.id).call_sign;
   await m_popup.show(
     "Unimplemented Error",
