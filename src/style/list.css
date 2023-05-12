@@ -1,0 +1,74 @@
+ul {
+  --trash_can_size: 1.8rem;
+}
+
+ul {
+  list-style: none;
+  border-style: solid;
+  border-width: var(--border_width);
+  border-color: var(--border_color);
+  border-radius: var(--border_radius);
+  padding: 0;
+  margin: 0;
+  display: inline-block;
+}
+
+ul > li {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  margin: 0;
+  border-width: 0;
+  border-style: solid;
+  border-color: var(--border_color);
+  border-radius: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+ul > li:first-child {
+  /* Important so the background color doesn't overlap with the parent border */
+  border-top-left-radius: var(--border_radius);
+  border-top-right-radius: var(--border_radius);
+}
+
+ul > li:last-child {
+  /* Important so the background color doesn't overlap with the parent border */
+  border-bottom-left-radius: var(--border_radius);
+  border-bottom-right-radius: var(--border_radius);
+}
+
+ul > li:not(:last-child) {
+  border-bottom-width: var(--border_width);
+}
+
+ul.selectable > li {
+  cursor: pointer;
+}
+ul.selectable > li:hover {
+  background-color: var(--highlight_color);
+}
+
+ul .spacer {
+  flex: 1;
+}
+
+ul button.trash {
+  cursor: pointer;
+  flex: 0 var(--trash_can_size);
+  background-image: url("../img/trash_can.svg");
+  background-size: cover;
+  background-color: transparent;
+  padding: 0;
+  border: 0;
+  border-radius: var(--border_radius);
+  margin-left: 3rem;
+  width: var(--trash_can_size);
+  height: var(--trash_can_size);
+}
+
+ul button.trash:hover {
+  filter: contrast(0%);
+}

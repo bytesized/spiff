@@ -7,9 +7,20 @@
   border-top-color: var(--accent_color);
   border-radius: 50%;
   animation: spin 1s linear infinite;
+  /*
+   * Override either the width or the height to have that determine the size of the spinner and
+   * then the other dimension will be taken care of by `aspect-ratio`.
+   */
+  aspect-ratio: 1 / 1;
+  height: auto;
+  width: auto;
 }
 
 @keyframes spin {
   0% { transform: rotate(0); }
   100% { transform: rotate(1turn); }
+}
+
+.busy_spinner.medium_size {
+  height: 5rem;
 }

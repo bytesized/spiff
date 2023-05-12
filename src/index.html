@@ -15,6 +15,8 @@
   <link rel="stylesheet" href="style/text_button_box.css" />
   <link rel="stylesheet" href="style/popup.css" />
   <link rel="stylesheet" href="style/busy_spinner.css" />
+  <link rel="stylesheet" href="style/list.css" />
+  <link rel="stylesheet" href="style/text.css" />
 
   <script type="module">
     import * as m_text_button_box from "./js/text_button_box.mjs";
@@ -29,13 +31,12 @@
 <body class="popup_hidden">
   <div class="vbox">
     <div id="top_bar" class="hbox">
-      <img id="bar_logo" src="img/logo.svg" height="100%" alt="Spiff Spaceship Logo">
+      <img id="bar_logo" src="img/logo.svg" height="100%" alt="Spiff Spaceship Logo" />
     </div>
     <div id="page_container">
       <div class="page active_page">
         <h1>Select an Agent</h1>
-        <ul id="agent_list">
-        </ul>
+        <div id="agent_list" class="busy_spinner medium_size"></div>
         <h2>Add New Agent</h2>
         <div id="add_agent_tbb" class="text_button_box">
           <input type="text" placeholder="Token" />

@@ -2,7 +2,10 @@
   --background_color: #171717;
   --accent_color: #BA1717;
   --subtle_accent_color: #353535;
+  --highlight_color: #380707;
   --border_color: #909090;
+  --border_width: 0.1rem;
+  --border_radius: 0.5rem;
   --text_color: white;
 }
 
