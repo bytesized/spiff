@@ -28,9 +28,21 @@ export class logger {
     }
   }
 
+  debug_if(condition, ...message) {
+    if (condition) {
+      this.debug(...message);
+    }
+  }
+
   info(...message) {
     if (this.log_level <= e_log_level.info) {
       console.info(...this.#format(message))
+    }
+  }
+
+  info_if(condition, ...message) {
+    if (condition) {
+      this.info(...message);
     }
   }
 
@@ -40,9 +52,21 @@ export class logger {
     }
   }
 
+  warn_if(condition, ...message) {
+    if (condition) {
+      this.warn(...message);
+    }
+  }
+
   error(...message) {
     if (this.log_level <= e_log_level.error) {
       console.error(...this.#format(message))
+    }
+  }
+
+  error_if(condition, ...message) {
+    if (condition) {
+      this.error(...message);
     }
   }
 }
