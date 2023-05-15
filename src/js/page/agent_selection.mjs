@@ -16,9 +16,9 @@ export function init() {
 async function add_agent(box) {
   // TODO: Implement this
   await m_popup.show(
-    "Unimplemented Error",
-    "Oops, I haven't implemented agent adding functionality yet",
     {
+      title: "Unimplemented Error",
+      message: "Oops, I haven't implemented agent adding functionality yet",
       buttons: [m_popup.e_button.ok],
       allow_non_button_close: true,
       button_activated_by_enter_key: m_popup.e_button.ok,
@@ -29,9 +29,9 @@ async function add_agent(box) {
 async function create_agent(box) {
   // TODO: Implement this
   await m_popup.show(
-    "Unimplemented Error",
-    "Oops, I haven't implemented agent creation functionality yet",
     {
+      title: "Unimplemented Error",
+      message: "Oops, I haven't implemented agent creation functionality yet",
       buttons: [m_popup.e_button.ok],
       allow_non_button_close: true,
       button_activated_by_enter_key: m_popup.e_button.ok,
@@ -67,9 +67,10 @@ async function select_agent(clicked) {
   // TODO: Implement this
   let call_sign = m_agent.get_cached_agent_data(clicked.id).call_sign;
   await m_popup.show(
-    "Unimplemented Error",
-    `Oops, I haven't implemented selection functionality yet, but you clicked: ${call_sign}`,
     {
+      title: "Unimplemented Error",
+      message:
+        `Oops, I haven't implemented selection functionality yet, but you clicked: ${call_sign}`,
       buttons: [m_popup.e_button.ok],
       allow_non_button_close: true,
       button_activated_by_enter_key: m_popup.e_button.ok,
@@ -81,9 +82,10 @@ async function remove_agent(clicked) {
   // TODO: Implement this
   let call_sign = m_agent.get_cached_agent_data(clicked.id).call_sign;
   await m_popup.show(
-    "Unimplemented Error",
-    `Oops, I haven't implemented removal functionality yet, but you clicked: ${call_sign}`,
     {
+      title: "Unimplemented Error",
+      message:
+        `Oops, I haven't implemented removal functionality yet, but you clicked: ${call_sign}`,
       buttons: [m_popup.e_button.ok],
       allow_non_button_close: true,
       button_activated_by_enter_key: m_popup.e_button.ok,

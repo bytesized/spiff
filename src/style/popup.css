@@ -1,17 +1,17 @@
 #under_popup_overlay {
+  display: none;
   position: fixed;
   top: 0;
   bottom: 0;
   left: 0;
   right: 0;
   background-color: rgba(0, 0, 0, 0.9);
-  display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.popup_hidden #under_popup_overlay {
-  display: none;
+#under_popup_overlay.popup_visible {
+  display: flex;
 }
 
 #popup {
@@ -26,11 +26,20 @@
   max-width: 100%;
 }
 
-.popup_title {
+#popup h1 {
   margin-top: 0;
 }
 
-.popup_message {
+#popup textarea {
+  --padding_size: 0.2rem;
+  --border_width: 0.15rem;
+
+  resize: none;
+  height: 10rem;
+  width: calc(100% - (2 * var(--border_width)) - (2 * var(--padding_size)));
+  border-width: var(--border_width);
+  padding: var(--padding_size);
+  margin-bottom: 1rem;
 }
 
 .popup_button_box {
@@ -38,7 +47,7 @@
   flex-direction: row;
 }
 
-.popup_button {
+.popup_button_box button {
   flex: 0;
 }
 
