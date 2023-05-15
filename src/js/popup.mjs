@@ -6,6 +6,9 @@ const k_popup_button_class = "popup_button";
 const k_popup_button_box_spacer_class = "popup_button_box_spacer";
 const k_popup_overlay_id = "under_popup_overlay";
 
+// Allows us to serialize popups so we don't try to show two at once.
+let g_popup_queue = Promise.resolve();
+
 export const k_closed_by_overlay = "popup_closed_by_overlay";
 let g_overlay_handler = null;
 
@@ -58,18 +61,16 @@ const k_button_properties = {
   },
 };
 
-export async function show(title,
-                           message,
-                           {
-                            buttons,
-                            allow_non_button_close,
-                            button_activated_by_enter_key
-                           } = {}) {
-  if (!document.body.classList.contains(k_hide_popup_class)) {
-    throw new Error("Attempted to show popup when popup is already shown");
-  }
-
-  return new Promise(resolve => {
+export async function show(
+  title,
+  message,
+  {
+    buttons,
+    allow_non_button_close,
+    button_activated_by_enter_key
+  } = {}
+) {
+  g_popup_queue = g_popup_queue.then(() => {}, () => {}).then(() => new Promise(resolve => {
     let title_el = document.createElement("h1");
     title_el.classList.add(k_popup_title_class);
     title_el.textContent = title;
@@ -133,5 +134,6 @@ export async function show(title,
     }
 
     show_raw(title_el, message_el, button_box);
-  });
+  }));
+  return g_popup_queue;
 }
