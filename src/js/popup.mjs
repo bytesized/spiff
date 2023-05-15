@@ -70,7 +70,7 @@ export async function show(
     button_box.classList.add(k_popup_button_box_class);
     popup_elements.push(button_box);
 
-    if (!buttons || !buttons.length) {
+    if (!buttons) {
       buttons = [e_button.close];
     }
 
