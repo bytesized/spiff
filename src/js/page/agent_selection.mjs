@@ -22,6 +22,7 @@ async function add_agent(box) {
     return m_error.show_api_failure_popup(response);
   }
   let id = m_agent.add(token, response.payload.data);
+  box.input.value = "";
   refresh_list();
 }
 
