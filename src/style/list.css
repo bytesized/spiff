@@ -48,6 +48,9 @@ ul.selectable > li {
   cursor: pointer;
 }
 ul.selectable > li:hover {
+  background-color: var(--subtle_accent_color);
+}
+ul.selectable > li.selected {
   background-color: var(--highlight_color);
 }
 

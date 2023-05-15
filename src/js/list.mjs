@@ -1,6 +1,7 @@
 const k_selectable_class = "selectable";
 const k_spacer_class = "spacer";
 const k_trash_button_class = "trash";
+const k_selected_item_class = "selected";
 const k_item_id_attribute = "list_id";
 
 /**
@@ -23,10 +24,13 @@ const k_item_id_attribute = "list_id";
  *        If passed, delete icons will be placed next to each list item and, when clicked, this
  *        handler will be invoked. The argument passed to it will be the same as the argument that
  *        would be passed to `handler`.
+ * @param selected_id
+ *        If passed, the item with this id will be selected. Otherwise, no item will initially be
+ *        selected.
  * @return
  *        The created list element.
  */
-export function create_selectable(items, handler, {delete_handler} = {}) {
+export function create_selectable(items, handler, {delete_handler, selected_id} = {}) {
   let list = document.createElement("ul");
   list.classList.add(k_selectable_class);
 
@@ -39,6 +43,9 @@ export function create_selectable(items, handler, {delete_handler} = {}) {
       event.stopPropagation();
       await handler(handler_arg);
     });
+    if (selected_id == item_id) {
+      item_el.classList.add(k_selected_item_class);
+    }
     list.append(item_el);
 
     let contents_container = document.createElement("div");
@@ -61,4 +68,11 @@ export function create_selectable(items, handler, {delete_handler} = {}) {
     }
   }
   return list;
+}
+
+export function select_item(list, item) {
+  for (const el of list.getElementsByClassName(k_selected_item_class)) {
+    el.classList.remove(k_selected_item_class);
+  }
+  item.classList.add(k_selected_item_class);
 }
