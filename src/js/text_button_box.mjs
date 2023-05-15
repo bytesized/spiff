@@ -82,6 +82,16 @@ export function clear_busy(box_el) {
   }
 }
 
+/**
+ * When the button associated with the passed box is clicked, the passed handler is called. The
+ * argument that it is passed will be an object with these properties:
+ *  element
+ *    The button box itself
+ *  input
+ *    The `<input>` in the button box.
+ *  button
+ *    The `<button>` in the button box.
+ */
 export function connect_handler(box_id, handler) {
   let box = document.getElementById(box_id);
   let button = get_button(box);
