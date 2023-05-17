@@ -46,6 +46,10 @@ export function set_selected(agent_id) {
   k_storage.write(k_selected_agent_key, agent_id);
 }
 
+export function clear_selected() {
+  k_storage.remove(k_selected_agent_key);
+}
+
 /**
  * @param agent_id
  *        An agent id retrieved via `get_available()` or `get_selected()`.
@@ -64,6 +68,10 @@ function set_cached_agent_data(agent_id, data) {
   k_storage.write_json(k_agent_data_key_prefix + agent_id.toString(), data);
 }
 
+function clear_cached_agent_data(agent_id) {
+  k_storage.remove(k_agent_data_key_prefix + agent_id.toString());
+}
+
 export function add(auth_token, data) {
   let agent_id = k_storage.read_int(k_next_agent_id_key);
   k_storage.write_int(k_next_agent_id_key, agent_id + 1);
@@ -77,6 +85,20 @@ export function add(auth_token, data) {
 
   if (get_selected() == null) {
     set_selected(agent_id);
+  }
+
+  return agent_id;
+}
+
+export function remove(agent_id) {
+  clear_cached_agent_data(agent_id);
+
+  let available_agents = get_available();
+  available_agents = available_agents.filter(id => id != agent_id);
+  set_available(available_agents);
+
+  if (get_selected() == agent_id) {
+    clear_selected();
   }
 }
 

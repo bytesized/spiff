@@ -51,6 +51,10 @@ function raw_write(module_name, key, value) {
   localStorage.setItem(k_localstorage_key_prefix + module_name + "|" + key, value);
 }
 
+function raw_remove(module_name, key) {
+  localStorage.removeItem(k_localstorage_key_prefix + module_name + "|" + key);
+}
+
 function raw_read(module_name, key) {
   return localStorage.getItem(k_localstorage_key_prefix + module_name + "|" + key);
 }
@@ -100,6 +104,13 @@ class storer {
 
   write_json(key, value) {
     this.write(key, JSON.stringify(value));
+  }
+
+  remove(key) {
+    if (key == k_version_key) {
+      throw new Error("Invalid for a module to attempt to remove its own stored version data.");
+    }
+    raw_remove(this.module_name, key);
   }
 
   read(key) {

@@ -63,27 +63,24 @@ function refresh_list() {
 }
 
 async function select_agent(clicked) {
-  // TODO: Implement this
-  let call_sign = m_agent.get_cached_agent_data(clicked.id).call_sign;
-  await m_popup.show({
-    title: "Unimplemented Error",
-    message:
-      `Oops, I haven't implemented selection functionality yet, but you clicked: ${call_sign}`,
-    buttons: [m_popup.e_button.ok],
-    allow_non_button_close: true,
-    button_activated_by_enter_key: m_popup.e_button.ok,
-  });
+  m_agent.set_selected(clicked.id);
+  refresh_list();
 }
 
 async function remove_agent(clicked) {
-  // TODO: Implement this
   let call_sign = m_agent.get_cached_agent_data(clicked.id).call_sign;
-  await m_popup.show({
-    title: "Unimplemented Error",
+  let popup_button = await m_popup.show({
+    title: "Remove Agent?",
     message:
-      `Oops, I haven't implemented removal functionality yet, but you clicked: ${call_sign}`,
-    buttons: [m_popup.e_button.ok],
+      `Are you sure you want to remove agent "${call_sign.toLowerCase()}"? If you haven't ` +
+      `already backed up your agent's token, it may be impossible to recover access to this ` +
+      `agent.` ,
+    buttons: [m_popup.e_button.yes, m_popup.e_button.no],
     allow_non_button_close: true,
-    button_activated_by_enter_key: m_popup.e_button.ok,
   });
+  if (popup_button != m_popup.e_button.yes) {
+    return;
+  }
+  m_agent.remove(clicked.id);
+  refresh_list();
 }
