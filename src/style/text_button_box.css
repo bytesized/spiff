@@ -16,17 +16,20 @@
 
 .text_button_box > input[type="text"] {
   flex: 1;
+  min-width: 5rem;
   appearance: none;
   border-width: var(--text_button_box_border_width);
   border-right-width: 0;
   border-style: solid;
   border-color: var(--border_color);
-  border-bottom-left-radius: var(--text_button_box_border_radius);
-  border-top-left-radius: var(--text_button_box_border_radius);
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
+  border-radius: 0;
   padding-left: 0.75rem;
   background-color: var(--background_color);
+}
+
+.text_button_box > input[type="text"]:first-child {
+  border-bottom-left-radius: var(--text_button_box_border_radius);
+  border-top-left-radius: var(--text_button_box_border_radius);
 }
 
 .text_button_box > button {

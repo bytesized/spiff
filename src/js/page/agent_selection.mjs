@@ -6,6 +6,8 @@ import * as m_popup from "../popup.mjs";
 import * as m_text_button_box from "../text_button_box.mjs";
 
 const k_agent_list_id = "agent_list";
+const k_create_agent_call_sign_input_id = "create_agent_call_sign";
+const k_create_agent_faction_input_id = "create_agent_faction";
 const k_agent_list_empty_string = "No Agents Found";
 
 const k_invalid_agent_name = 422;
@@ -29,9 +31,8 @@ async function add_agent(box) {
 }
 
 async function create_agent(box) {
-  let call_sign = box.input.value;
-  // This is just going to be hardcoded, for now.
-  let faction = "COSMIC";
+  let call_sign = document.getElementById(k_create_agent_call_sign_input_id).value;
+  let faction = document.getElementById(k_create_agent_faction_input_id).value;
   let response = await m_api.register_agent(call_sign, faction);
   if (!response.success) {
     if (response.payload?.error?.code == k_invalid_agent_name) {

@@ -11,14 +11,16 @@ export function init() {
   for (const box of document.getElementsByClassName(k_box_class)) {
     try {
       let button = get_button(box);
-      let input = get_input(box);
-      input.addEventListener("keydown", event => {
-        event = event || window.event;
-        if (event.key == "Enter") {
-          button.click();
-          event.stopPropagation();
-        }
-      });
+      let inputs = get_inputs(box);
+      for (const input of inputs) {
+        input.addEventListener("keydown", event => {
+          event = event || window.event;
+          if (event.key == "Enter") {
+            button.click();
+            event.stopPropagation();
+          }
+        });
+      }
     } catch (ex) {
       k_log.error(ex);
     }
@@ -37,12 +39,12 @@ function get_button(box_el) {
   return button;
 }
 
-function get_input(box_el) {
-  let input = box_el.getElementsByTagName("input")[0];
-  if (!input) {
+function get_inputs(box_el) {
+  let inputs = box_el.getElementsByTagName("input");
+  if (inputs.length == 0) {
     throw new Error("text_button_box missing its input", box_el);
   }
-  return input;
+  return inputs;
 }
 
 export function is_busy(box_el) {
@@ -55,9 +57,10 @@ export function set_busy(box_el) {
   }
 
   let button = get_button(box_el);
-  let input = get_input(box_el);
   button.disabled = true;
-  input.disabled = true;
+  for (const input of get_inputs(box_el)) {
+    input.disabled = true;
+  }
 
   let overlay = document.createElement("div");
   overlay.classList.add(k_box_busy_overlay_class);
@@ -72,10 +75,10 @@ export function clear_busy(box_el) {
   }
 
   let button = get_button(box_el);
-  let input = get_input(box_el);
-
   button.disabled = false;
-  input.disabled = false;
+  for (const input of get_inputs(box_el)) {
+    input.disabled = false;
+  }
 
   for (const overlay of box_el.getElementsByClassName(k_box_busy_overlay_class)) {
     overlay.remove();
@@ -88,14 +91,15 @@ export function clear_busy(box_el) {
  *  element
  *    The button box itself
  *  input
- *    The `<input>` in the button box.
+ *    The `<input>` in the button box. If the button box contains multiple inputs, this will
+ *    contain an arbitrary one.
  *  button
  *    The `<button>` in the button box.
  */
 export function connect_handler(box_id, handler) {
   let box = document.getElementById(box_id);
   let button = get_button(box);
-  let input = get_input(box);
+  let input = get_inputs(box)[0];
   button.addEventListener("click", async event => {
     event = event || window.event;
     event.stopPropagation();
