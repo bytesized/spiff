@@ -8,6 +8,8 @@ import * as m_text_button_box from "../text_button_box.mjs";
 const k_agent_list_id = "agent_list";
 const k_agent_list_empty_string = "No Agents Found";
 
+const k_invalid_agent_name = 422;
+
 export function init() {
   m_text_button_box.connect_handler("add_agent_tbb", add_agent);
   m_text_button_box.connect_handler("create_agent_tbb", create_agent);
@@ -21,20 +23,32 @@ async function add_agent(box) {
   if (!response.success) {
     return m_error.show_api_failure_popup(response);
   }
-  let id = m_agent.add(token, response.payload.data);
+  let id = m_agent.add(token, response.payload.data.symbol);
   box.input.value = "";
   refresh_list();
 }
 
 async function create_agent(box) {
-  // TODO: Implement this
-  await m_popup.show({
-    title: "Unimplemented Error",
-    message: "Oops, I haven't implemented agent creation functionality yet",
-    buttons: [m_popup.e_button.ok],
-    allow_non_button_close: true,
-    button_activated_by_enter_key: m_popup.e_button.ok,
-  });
+  let call_sign = box.input.value;
+  // This is just going to be hardcoded, for now.
+  let faction = "COSMIC";
+  let response = await m_api.register_agent(call_sign, faction);
+  if (!response.success) {
+    if (response.payload?.error?.code == k_invalid_agent_name) {
+      return m_popup.show({
+        title: "Error: Invalid Agent Name",
+        message: response.payload.error.data.symbol[0],
+        buttons: [m_popup.e_button.ok],
+        allow_non_button_close: true,
+        button_activated_by_enter_key: m_popup.e_button.ok,
+      });
+    } else {
+      return m_error.show_api_failure_popup(response);
+    }
+  }
+  m_agent.add(response.payload.data.token, response.payload.data.agent.symbol);
+  box.input.value = "";
+  refresh_list();
 }
 
 function refresh_list() {

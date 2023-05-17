@@ -72,12 +72,12 @@ function clear_cached_agent_data(agent_id) {
   k_storage.remove(k_agent_data_key_prefix + agent_id.toString());
 }
 
-export function add(auth_token, data) {
+export function add(auth_token, call_sign) {
   let agent_id = k_storage.read_int(k_next_agent_id_key);
   k_storage.write_int(k_next_agent_id_key, agent_id + 1);
   agent_id = agent_id.toString();
 
-  set_cached_agent_data(agent_id, {auth_token, call_sign: data.symbol});
+  set_cached_agent_data(agent_id, {auth_token, call_sign});
 
   let available_agents = get_available();
   available_agents.push(agent_id);
