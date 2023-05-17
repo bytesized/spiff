@@ -183,19 +183,8 @@ function process_queue() {
       async response => {
         g_in_flight_count -= 1;
 
-        let response_received_date = Date.now();
-
-        let request_received_date;
-        let request_received_header = get_single_header(response, "Date");
-        if (request_received_header == null) {
-          request_received_date = response_received_date;
-        } else {
-          request_received_date = new Date(request_received_header).getTime();
-          if (isNaN(request_received_date)) {
-            k_log.warn("Response's Date header could not be parsed: ", request_received_header);
-            request_received_date = response_received_date;
-          }
-        }
+        let received_time = Date.now();
+        get_single_header(response, "Date");
 
         if (response.status == 429) {
           g_request_queue.unshift(request);
@@ -206,7 +195,7 @@ function process_queue() {
             if (isNaN(retry_delay)) {
               k_log.warn("retry-after header has a non-integer value:", retry_header);
             } else {
-              retry_at = request_received_date + (retry_delay * 1000)
+              retry_at = received_time + (retry_delay * 1000)
             }
           }
           if (retry_at == null) {
@@ -228,7 +217,7 @@ function process_queue() {
               if (g_no_requests_until_after == null) {
                 return "immediately";
               } else {
-                return `in ${g_no_requests_until_after - response_received_date}ms`;
+                return `in ${g_no_requests_until_after - received_time}ms`;
               }
             }
           );
@@ -236,8 +225,7 @@ function process_queue() {
           return;
         }
 
-        k_log.info("Server received request to", request.path, "at", request_received_date,
-                   ". Response received at", response_received_date);
+        k_log.info("Response from", request.path, "received at", received_time);
         let result = {success: response.ok};
         try {
           result.payload = await response.json();
@@ -249,7 +237,9 @@ function process_queue() {
           }
         }
         if (!result.success) {
-          result.error_message = result?.payload?.error?.message;
+          if (result?.payload?.error && "message" in result.payload.error) {
+            result.error_message = `Server says: ${result?.payload?.error?.message}`;
+          }
           result.error_code = result?.payload?.error?.code;
           if (response.status >= 400 && response.status <= 499) {
             result.error_type = e_request_error.client;
