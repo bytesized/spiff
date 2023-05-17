@@ -5,7 +5,6 @@ const k_log = new m_log.logger(m_log.e_log_level.debug, "text_button_box");
 
 const k_box_class = "text_button_box";
 const k_box_selector = `.${k_box_class}`;
-const k_box_busy_overlay_class = "text_button_box_busy_overlay";
 
 export function init() {
   for (const box of document.getElementsByClassName(k_box_class)) {
@@ -48,7 +47,7 @@ function get_inputs(box_el) {
 }
 
 export function is_busy(box_el) {
-  return box_el.getElementsByClassName(k_box_busy_overlay_class).length > 0;
+  return m_busy_spinner.has_busy_spinner(box_el);
 }
 
 export function set_busy(box_el) {
@@ -62,11 +61,7 @@ export function set_busy(box_el) {
     input.disabled = true;
   }
 
-  let overlay = document.createElement("div");
-  overlay.classList.add(k_box_busy_overlay_class);
-  let spinner = m_busy_spinner.create();
-  overlay.appendChild(spinner);
-  box_el.appendChild(overlay);
+  box_el.appendChild(m_busy_spinner.create({with_overlay: true}));
 }
 
 export function clear_busy(box_el) {
@@ -80,9 +75,7 @@ export function clear_busy(box_el) {
     input.disabled = false;
   }
 
-  for (const overlay of box_el.getElementsByClassName(k_box_busy_overlay_class)) {
-    overlay.remove();
-  }
+  m_busy_spinner.remove_overlay(box_el);
 }
 
 /**

@@ -1,3 +1,6 @@
+import * as m_busy_spinner from "./busy_spinner.mjs";
+
+const k_list_container_class = "list_container";
 const k_selectable_class = "selectable";
 const k_spacer_class = "spacer";
 const k_trash_button_class = "trash";
@@ -31,8 +34,12 @@ const k_item_id_attribute = "list_id";
  *        The created list element.
  */
 export function create_selectable(items, handler, {delete_handler, selected_id} = {}) {
+  let container = document.createElement("div");
+  container.classList.add(k_list_container_class);
+
   let list = document.createElement("ul");
   list.classList.add(k_selectable_class);
+  container.append(list);
 
   for (const [item_id, ...item_contents] of items) {
     let item_el = document.createElement("li");
@@ -67,7 +74,11 @@ export function create_selectable(items, handler, {delete_handler, selected_id} 
       item_el.append(trash_button);
     }
   }
-  return list;
+  return container;
+}
+
+function get_container(el) {
+  return el.closest("." + k_list_container_class);
 }
 
 export function select_item(list, item) {
@@ -75,4 +86,28 @@ export function select_item(list, item) {
     el.classList.remove(k_selected_item_class);
   }
   item.classList.add(k_selected_item_class);
+}
+
+export function is_busy(list) {
+  return m_busy_spinner.has_busy_spinner(get_container(list));
+}
+
+export function set_busy(list) {
+  let container = get_container(list);
+  if (is_busy(container)) {
+    throw new Error("Attempted to set already busy box to busy");
+  }
+
+  let s = m_busy_spinner.create({with_overlay: true});
+  container.append(s);
+  s.id = "foobar";
+}
+
+export function clear_busy_by_container(list) {
+  let container = get_container(list);
+  if (!is_busy(container)) {
+    throw new Error("Attempted to clear busy status of non-busy box");
+  }
+
+  m_busy_spinner.remove_overlay(container);
 }

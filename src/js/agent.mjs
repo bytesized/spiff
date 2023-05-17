@@ -68,6 +68,11 @@ function set_cached_agent_data(agent_id, data) {
   k_storage.write_json(k_agent_data_key_prefix + agent_id.toString(), data);
 }
 
+export function update_cached_agent_data(agent_id, update) {
+  let existing = get_cached_agent_data(agent_id);
+  set_cached_agent_data(agent_id, Object.assign(existing, update));
+}
+
 function clear_cached_agent_data(agent_id) {
   k_storage.remove(k_agent_data_key_prefix + agent_id.toString());
 }

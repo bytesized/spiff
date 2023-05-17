@@ -24,3 +24,35 @@
 .busy_spinner.medium_size {
   height: 5rem;
 }
+
+/* Because this relies on `position: absolute`, the parent needs to be a positioned element. */
+.sub_spinner_overlay {
+  background-color: rgba(0, 0, 0, 0.7);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0;
+  border-width: 0;
+  container-type: size;
+  container-name: resize-box;
+}
+
+.sub_spinner_overlay .busy_spinner {
+  width: calc(100% - 2 * var(--busy_spinner_border_width));
+  aspect-ratio: 1/1;
+  margin: auto;
+}
+
+/*
+ * This allows the spinner to occupy as much space as possible while retaining the correct aspect
+ * ratio.
+ */
+@container resize-box (aspect-ratio > 1/1) {
+  .sub_spinner_overlay .busy_spinner {
+    width: auto;
+    height: calc(100% - 2 * var(--busy_spinner_border_width));
+  }
+}

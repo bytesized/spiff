@@ -78,7 +78,18 @@ function refresh_list() {
 }
 
 async function select_agent(clicked) {
+  m_list.set_busy(clicked.list);
+
+  let auth_token = m_agent.get_cached_agent_data(clicked.id).auth_token;
+  let response = await m_api.get_agent_details(auth_token);
+  if (!response.success) {
+    return m_error.show_api_failure_popup(response);
+  }
+  m_agent.update_cached_agent_data(clicked.id, {call_sign: response.payload.data.symbol});
+
   m_agent.set_selected(clicked.id);
+  // We don't need `m_list.clear_busy(clicked.list)` because `refresh_list()` replaces the whole
+  // list element.
   refresh_list();
 }
 
