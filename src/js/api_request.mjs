@@ -1,6 +1,6 @@
 import * as m_log from "./log.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.info, "api_request");
+const k_log = new m_log.logger(m_log.e_log_level.warn, "api_request");
 
 // Server request rate limits.
 const k_request_limits = [
