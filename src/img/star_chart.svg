@@ -1,0 +1,34 @@
+<svg version="1.1"
+     width="100" height="100"
+     xmlns="http://www.w3.org/2000/svg">
+  <!-- Background Color -->
+  <rect width="100%" height="100%" fill="#171717" />
+  <ellipse fill="none" stroke="white" stroke-width="7px"
+           cx="50" cy="50"
+           rx="10" ry="40"
+  />
+  <ellipse fill="none" stroke="white" stroke-width="7px"
+           cx="50" cy="50"
+           rx="18" ry="40"
+           transform="rotate(90 50 50)"
+  />
+  <line x1="41" y1="67.5" x2="59" y2="32.5"
+        stroke="white" stroke-width="2px" stroke-dasharray="2 4" stroke-linecap="round"
+  />
+  <!--
+    Unit pentagon points are (0, 1), (0.95105652, 0.30901699), (0.58778525, -0.80901699),
+                             (-0.58778525, -0.80901699), (-0.95105652, 0.30901699)
+    Choosing center point = (80, 15), radius = 9
+  -->
+  <path fill="white"
+        d="
+          M 80,6
+          A 7 7 0 0 0 88.55950868,12.21884709
+          A 7 7 0 0 0 85.29006725,22.28115291
+          A 7 7 0 0 0 74.70993275,22.28115291
+          A 7 7 0 0 0 71.44049132,12.21884709
+          A 7 7 0 0 0 80,6
+          Z
+        "
+  />
+</svg>
