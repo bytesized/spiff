@@ -32,3 +32,8 @@
   cursor: pointer;
   flex: 0;
 }
+
+#top_bar img.disabled {
+  filter: contrast(30%);
+  cursor: default;
+}
