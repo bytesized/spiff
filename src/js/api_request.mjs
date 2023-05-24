@@ -185,29 +185,26 @@ function process_queue() {
 
         let received_time = Date.now();
 
-        if (response.status == 429) {
-          g_request_queue.unshift(request);
-          let retry_at = null;
-          let retry_header = get_single_header(response, "retry-after");
+        let retry_at = null;
+        let retry_header = get_single_header(response, "retry-after");
+        if (retry_header != null) {
+          let retry_delay = parseInt(retry_header, 10);
+          if (isNaN(retry_delay)) {
+            k_log.warn("retry-after header has a non-integer value:", retry_header);
+          } else {
+            retry_at = received_time + (retry_delay * 1000)
+          }
+        }
+        if (retry_at == null) {
+          retry_header = get_single_header(response, "x-ratelimit-reset");
           if (retry_header != null) {
-            let retry_delay = parseInt(retry_header, 10);
-            if (isNaN(retry_delay)) {
-              k_log.warn("retry-after header has a non-integer value:", retry_header);
-            } else {
-              retry_at = received_time + (retry_delay * 1000)
-            }
+            retry_at = Date.new(retry_header).getTime();
           }
-          if (retry_at == null) {
-            retry_header = get_single_header(response, "x-ratelimit-reset");
-            if (retry_header != null) {
-              retry_at = Date.new(retry_header).getTime();
-            }
-          }
-          if (retry_at != null) {
-            g_no_requests_until_after = Math.max(g_no_requests_until_after, retry_at);
-          }
-          k_log.info(
-            "HTTP 429 - Need to retry request to", request.path, ". Hit limit of type: ",
+        }
+        if (retry_at != null) {
+          g_no_requests_until_after = Math.max(g_no_requests_until_after, retry_at);
+          k_log.warn(
+            "Server requests that client waits. Hit limit of type: ",
             () => get_single_header(response, "x-ratelimit-type", "[unknown]"), ", burst",
             () => get_single_header(response, "x-ratelimit-limit-burst", "[unknown]"), "per",
             () => get_single_header(response, "x-ratelimit-limit-per-second", "[unknown]"),
@@ -220,6 +217,11 @@ function process_queue() {
               }
             }
           );
+        }
+
+        if (response.status == 429) {
+          g_request_queue.unshift(request);
+          k_log.warn("HTTP 429 - Need to retry request");
           maybe_begin_processing();
           return;
         }
