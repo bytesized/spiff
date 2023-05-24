@@ -184,7 +184,6 @@ function process_queue() {
         g_in_flight_count -= 1;
 
         let received_time = Date.now();
-        get_single_header(response, "Date");
 
         if (response.status == 429) {
           g_request_queue.unshift(request);
