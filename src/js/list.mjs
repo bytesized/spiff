@@ -103,7 +103,7 @@ export function set_busy(list) {
   s.id = "foobar";
 }
 
-export function clear_busy_by_container(list) {
+export function clear_busy(list) {
   let container = get_container(list);
   if (!is_busy(container)) {
     throw new Error("Attempted to clear busy status of non-busy box");
