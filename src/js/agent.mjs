@@ -36,7 +36,7 @@ function set_available(agents) {
 
 /**
  * @returns
- *        A string id.
+ *        A string id, or null if no agent is selected.
  */
 export function get_selected() {
   return k_storage.read(k_selected_agent_key);
