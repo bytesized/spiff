@@ -22,10 +22,10 @@
     import * as m_text_button_box from "./js/text_button_box.mjs";
     import * as m_agent_selection from "./js/page/agent_selection.mjs";
 
-    window.addEventListener("DOMContentLoaded", () => {
-      m_text_button_box.init();
-      m_agent_selection.init();
-    });
+    window.addEventListener("DOMContentLoaded", async () => Promise.allSettled([
+      m_text_button_box.init(),
+      m_agent_selection.init(),
+    ]));
   </script>
 </head>
 <body>

@@ -12,9 +12,17 @@ const k_agent_list_empty_string = "No Agents Found";
 
 const k_invalid_agent_name = 422;
 
-export function init() {
+export async function init() {
   m_text_button_box.connect_handler("add_agent_tbb", add_agent);
   m_text_button_box.connect_handler("create_agent_tbb", create_agent);
+
+  let default_agent_id = m_agent.get_selected();
+  if (default_agent_id != null) {
+    let refresh_response = await refresh_agent(default_agent_id);
+    if (!refresh_response.success) {
+      m_agent.clear_selected();
+    }
+  }
 
   refresh_list();
 }
@@ -80,17 +88,27 @@ function refresh_list() {
 async function select_agent(clicked) {
   m_list.set_busy(clicked.list);
 
-  let auth_token = m_agent.get_cached_agent_data(clicked.id).auth_token;
-  let response = await m_api.get_agent_details(auth_token);
-  if (!response.success) {
-    return m_error.show_api_failure_popup(response);
+  let refresh_response = await refresh_agent(clicked.id);
+  if (!refresh_response.success) {
+    m_list.clear_busy(clicked.list)
+    return m_error.show_api_failure_popup(refresh_response);
   }
-  m_agent.update_cached_agent_data(clicked.id, {call_sign: response.payload.data.symbol});
 
   m_agent.set_selected(clicked.id);
   // We don't need `m_list.clear_busy(clicked.list)` because `refresh_list()` replaces the whole
   // list element.
   refresh_list();
+}
+
+async function refresh_agent(agent_id) {
+  let auth_token = m_agent.get_cached_agent_data(agent_id).auth_token;
+  let response = await m_api.get_agent_details(auth_token);
+  if (!response.success) {
+    return response;
+  }
+
+  m_agent.update_cached_agent_data(clicked.id, {call_sign: response.payload.data.symbol});
+  return response;
 }
 
 async function remove_agent(clicked) {
