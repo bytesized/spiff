@@ -20,11 +20,11 @@
 
   <script type="module">
     import * as m_text_button_box from "./js/text_button_box.mjs";
-    import * as m_settings from "./js/page/settings.mjs";
+    import * as m_page from "./js/page.mjs";
 
     window.addEventListener("DOMContentLoaded", async () => Promise.allSettled([
       m_text_button_box.init(),
-      m_settings.init(),
+      m_page.init(),
     ]));
   </script>
 </head>
@@ -42,7 +42,7 @@
       </div>
     </div>
     <div id="page_container">
-      <div class="page active_page">
+      <div id="settings_page" class="page active_page">
         <h1>Select an Agent</h1>
         <div id="agent_list" class="busy_spinner medium_size"></div>
         <h2>Add New Agent</h2>
@@ -56,8 +56,14 @@
           <button>Create Agent</button>
         </div>
       </div>
-      <div class="page">
-        <h1>Some Other Page</h1>
+      <div id="agent_page" class="page">
+        <h1>Agent Info</h1>
+      </div>
+      <div id="star_chart_page" class="page">
+        <h1>Star Chart</h1>
+      </div>
+      <div id="ships_page" class="page">
+        <h1>Ships</h1>
       </div>
     </div>
   </div>

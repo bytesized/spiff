@@ -2,6 +2,7 @@ import * as m_agent from "../agent.mjs";
 import * as m_api from "../api.mjs";
 import * as m_error from "../error.mjs";
 import * as m_list from "../list.mjs";
+import * as m_page from "../page.mjs";
 import * as m_popup from "../popup.mjs";
 import * as m_text_button_box from "../text_button_box.mjs";
 
@@ -25,6 +26,7 @@ export async function init() {
   }
 
   refresh_list();
+  m_page.maybe_enable_navigation();
 }
 
 async function add_agent(box) {
@@ -36,6 +38,7 @@ async function add_agent(box) {
   let id = m_agent.add(token, response.payload.data.symbol);
   box.input.value = "";
   refresh_list();
+  m_page.maybe_enable_navigation();
 }
 
 async function create_agent(box) {
@@ -58,6 +61,7 @@ async function create_agent(box) {
   m_agent.add(response.payload.data.token, response.payload.data.agent.symbol);
   box.input.value = "";
   refresh_list();
+  m_page.maybe_enable_navigation();
 }
 
 function refresh_list() {
@@ -87,10 +91,12 @@ function refresh_list() {
 
 async function select_agent(clicked) {
   m_list.set_busy(clicked.list);
+  m_page.disable_navigation();
 
   let refresh_response = await refresh_agent(clicked.id);
   if (!refresh_response.success) {
-    m_list.clear_busy(clicked.list)
+    m_list.clear_busy(clicked.list);
+    m_page.maybe_enable_navigation();
     return m_error.show_api_failure_popup(refresh_response);
   }
 
@@ -98,6 +104,7 @@ async function select_agent(clicked) {
   // We don't need `m_list.clear_busy(clicked.list)` because `refresh_list()` replaces the whole
   // list element.
   refresh_list();
+  m_page.maybe_enable_navigation();
 }
 
 async function refresh_agent(agent_id) {
@@ -107,7 +114,7 @@ async function refresh_agent(agent_id) {
     return response;
   }
 
-  m_agent.update_cached_agent_data(clicked.id, {call_sign: response.payload.data.symbol});
+  m_agent.update_cached_agent_data(agent_id, {call_sign: response.payload.data.symbol});
   return response;
 }
 
@@ -127,4 +134,5 @@ async function remove_agent(clicked) {
   }
   m_agent.remove(clicked.id);
   refresh_list();
+  m_page.maybe_disable_navigation();
 }
