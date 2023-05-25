@@ -20,11 +20,11 @@
 
   <script type="module">
     import * as m_text_button_box from "./js/text_button_box.mjs";
-    import * as m_agent_selection from "./js/page/agent_selection.mjs";
+    import * as m_settings from "./js/page/settings.mjs";
 
     window.addEventListener("DOMContentLoaded", async () => Promise.allSettled([
       m_text_button_box.init(),
-      m_agent_selection.init(),
+      m_settings.init(),
     ]));
   </script>
 </head>
