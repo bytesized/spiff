@@ -185,38 +185,58 @@ function process_queue() {
 
         let received_time = Date.now();
 
-        let retry_at = null;
-        let retry_header = get_single_header(response, "retry-after");
-        if (retry_header != null) {
-          let retry_delay = parseInt(retry_header, 10);
-          if (isNaN(retry_delay)) {
-            k_log.warn("retry-after header has a non-integer value:", retry_header);
-          } else {
-            retry_at = received_time + (retry_delay * 1000)
-          }
-        }
-        if (retry_at == null) {
-          retry_header = get_single_header(response, "x-ratelimit-reset");
-          if (retry_header != null) {
-            retry_at = Date.new(retry_header).getTime();
-          }
-        }
-        if (retry_at != null) {
-          g_no_requests_until_after = Math.max(g_no_requests_until_after, retry_at);
-          k_log.warn(
-            "Server requests that client waits. Hit limit of type: ",
-            () => get_single_header(response, "x-ratelimit-type", "[unknown]"), ", burst",
-            () => get_single_header(response, "x-ratelimit-limit-burst", "[unknown]"), "per",
-            () => get_single_header(response, "x-ratelimit-limit-per-second", "[unknown]"),
-            "sec. Retrying",
-            () => {
-              if (g_no_requests_until_after == null) {
-                return "immediately";
-              } else {
-                return `in ${g_no_requests_until_after - received_time}ms`;
-              }
+        // Originally we set the rate limit any time `retry-after` was specified. But it seems to
+        // specify it way more often than necessary. So we are going to try to inspect
+        // a few other parts of the response to see if we should take it seriously.
+        let should_rate_limit = (status == 429);
+        if (!should_rate_limit) {
+          let limit_remaining = get_single_header(response, "x-ratelimit-remaining");
+          if (limit_remaining != null) {
+            limit_remaining = parseInt(limit_remaining, 10);
+            if (!isNaN(limit_remaining) && limit_remaining == 0) {
+              should_rate_limit = true;
             }
-          );
+          }
+        }
+
+        if (should_rate_limit) {
+          let retry_at = null;
+          let retry_header = get_single_header(response, "retry-after");
+          if (retry_header != null) {
+            let retry_delay = parseInt(retry_header, 10);
+            if (isNaN(retry_delay)) {
+              k_log.warn("retry-after header has a non-integer value:", retry_header);
+            } else {
+              retry_at = received_time + (retry_delay * 1000)
+            }
+          }
+          if (retry_at == null) {
+            retry_header = get_single_header(response, "x-ratelimit-reset");
+            if (retry_header != null) {
+              retry_at = Date.new(retry_header).getTime();
+            }
+          }
+          if (retry_at == null) {
+            k_log.warn(
+              "We ought to rate limit ourselves, but the server didn't give any guidance for",
+              "when it's ok to retry next."
+            );
+          } else {
+            if (g_no_requests_until_after == null) {
+              g_no_requests_until_after = retry_at;
+            } else {
+              g_no_requests_until_after = Math.max(g_no_requests_until_after, retry_at);
+            }
+            k_log.warn(
+              "Server requests that client waits. Hit limit of type: ",
+              () => get_single_header(response, "x-ratelimit-type", "[unknown]"), ", burst",
+              () => get_single_header(response, "x-ratelimit-limit-burst", "[unknown]"), "per",
+              () => get_single_header(response, "x-ratelimit-limit-per-second", "[unknown]"),
+              "sec. Retrying in",
+              () => g_no_requests_until_after - received_time,
+              "ms"
+            );
+          }
         }
 
         if (response.status == 429) {
@@ -302,7 +322,6 @@ function get_headers(response, name) {
 function get_single_header(response, name, default_val = null) {
   let matching_headers = get_headers(response, name);
   if (matching_headers.length < 1) {
-    k_log.warn("Response is missing the expected", name, "header.");
     return default_val;
   }
   if (matching_headers.length > 1) {
