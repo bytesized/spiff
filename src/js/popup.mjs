@@ -3,8 +3,8 @@ const k_popup_button_box_class = "popup_button_box";
 const k_popup_button_box_spacer_class = "popup_button_box_spacer";
 const k_popup_overlay_id = "under_popup_overlay";
 
-// Allows us to serialize popups so we don't try to show two at once.
-let g_popup_queue = Promise.resolve();
+// This Promise will allow us to serialize popups so we don't try to show two at once.
+let g_popup_queue = null;
 
 export const k_closed_by_overlay = "popup_closed_by_overlay";
 let g_overlay_handler = null;
@@ -33,6 +33,12 @@ const k_button_properties = {
     text: "No",
   },
 };
+
+// Unlike the `init` functions in most other modules, this one ought to be called before the
+// `DOMContentLoaded` event.
+export function init() {
+  g_popup_queue = new Promise(resolve => window.addEventListener("DOMContentLoaded", resolve));
+}
 
 export async function show(
   {
