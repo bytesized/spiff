@@ -15,7 +15,7 @@ export function create(module_name, module_version) {
   }
   existing_modules.add(module_name);
 
-  if (!storageAvailable("localStorage")) {
+  if (!storage_available("localStorage")) {
     m_popup.show({
       title: "Storage Error",
       message:
@@ -59,7 +59,7 @@ function raw_read(module_name, key) {
   return localStorage.getItem(k_localstorage_key_prefix + module_name + "|" + key);
 }
 
-function storageAvailable(type) {
+function storage_available(type) {
   let storage;
   try {
     storage = window[type];
