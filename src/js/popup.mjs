@@ -13,10 +13,10 @@ export const k_closed_by_escape_key = "popup_closed_by_escape_key";
 let g_document_keydown_handler = null;
 
 export const e_button = {
-  close: "close_button",
-  ok: "ok_button",
-  yes: "yes_button",
-  no: "no_button",
+  close: "e_button::close",
+  ok: "e_button::ok",
+  yes: "e_button::yes",
+  no: "e_button::no",
 };
 
 const k_button_properties = {

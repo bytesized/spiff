@@ -13,14 +13,14 @@ const k_max_in_flight = Math.min(...k_request_limits.map(l => l[0]));
 const k_duration_to_track_ms = Math.max(...k_request_limits.map(l => l[1]));
 
 export const e_request_error = {
-  exception: "request_error_exception",
-  json: "request_error_invalid_json",
-  client: "request_error_client_error",
-  server: "request_error_server_error",
-  status_code: "request_error_status_code",
+  exception: "e_request_error::exception",
+  json: "e_request_error::json",
+  client: "e_request_error::client",
+  server: "e_request_error::server",
+  status_code: "e_request_error::status_code",
 };
 
-const e_request_error_default_message = {
+const k_request_error_default_message = {
   [e_request_error.exception]: "fetch() threw an exception.",
   [e_request_error.json]: "Server response was not valid JSON.",
   [e_request_error.client]: "Client Error - Something was wrong with the API request made.",
@@ -270,7 +270,7 @@ function process_queue() {
             result.error_type = e_request_error.status_code;
           }
           if (!result.error_message) {
-            result.error_message = e_request_error_default_message[result.error_type];
+            result.error_message = k_request_error_default_message[result.error_type];
           }
           k_log.warn("Request failed", response);
         }
@@ -282,7 +282,7 @@ function process_queue() {
 
         let result = {success: false};
         result.error_type = e_request_error.exception;
-        result.error_message = e_request_error_default_message[result.error_type];
+        result.error_message = k_request_error_default_message[result.error_type];
 
         maybe_begin_processing();
         request.callback(result);

@@ -6,10 +6,10 @@ const k_active_page_class = "active_page";
 const k_nav_button_disabled_class = "disabled";
 
 const e_page = {
-  agent: "agent_page",
-  star_chart: "star_chart_page",
-  ships: "ships_page",
-  settings: "settings_page",
+  agent: "e_page::agent",
+  star_chart: "e_page::star_chart",
+  ships: "e_page::ships",
+  settings: "e_page::settings",
 };
 
 const k_pages = Object.values(e_page);
