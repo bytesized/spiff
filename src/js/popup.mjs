@@ -150,3 +150,5 @@ function hide() {
   overlay.classList.remove(k_show_popup_class);
   popup.replaceChildren();
 }
+
+init();

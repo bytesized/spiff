@@ -19,14 +19,12 @@
   <link rel="stylesheet" href="style/text.css" />
 
   <script type="module">
-    import * as m_text_button_box from "./js/text_button_box.mjs";
-    import * as m_page from "./js/page.mjs";
+    // This self initializes, but the initialization needs to happen before `DOMContentLoaded`, so
+    // make sure to import it early.
     import * as m_popup from "./js/popup.mjs";
 
-    // We want to init the popup system earlier than anything else. Fatal errors are generally
-    // shown via popup, and we want to make sure that the module is ready to display startup
-    // messages that other modules might have.
-    m_popup.init();
+    import * as m_text_button_box from "./js/text_button_box.mjs";
+    import * as m_page from "./js/page.mjs";
 
     window.addEventListener("DOMContentLoaded", async () => Promise.allSettled([
       m_text_button_box.init(),
