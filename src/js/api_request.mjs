@@ -186,18 +186,8 @@ function process_queue() {
         let received_time = Date.now();
 
         // Originally we set the rate limit any time `retry-after` was specified. But it seems to
-        // specify it way more often than necessary. So we are going to try to inspect
-        // a few other parts of the response to see if we should take it seriously.
+        // specify it way more often than necessary.
         let should_rate_limit = (status == 429);
-        if (!should_rate_limit) {
-          let limit_remaining = get_single_header(response, "x-ratelimit-remaining");
-          if (limit_remaining != null) {
-            limit_remaining = parseInt(limit_remaining, 10);
-            if (!isNaN(limit_remaining) && limit_remaining == 0) {
-              should_rate_limit = true;
-            }
-          }
-        }
 
         if (should_rate_limit) {
           let retry_at = null;
