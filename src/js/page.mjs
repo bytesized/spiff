@@ -62,7 +62,7 @@ export async function init() {
 }
 
 export function maybe_enable_navigation() {
-  if (m_agent.get_selected() != null) {
+  if (m_agent.k_current.id.is_set()) {
     enable_navigation();
   }
 }
@@ -80,7 +80,7 @@ export function enable_navigation() {
 }
 
 export function maybe_disable_navigation() {
-  if (m_agent.get_selected() == null) {
+  if (!m_agent.k_current.id.is_set()) {
     disable_navigation();
   }
 }

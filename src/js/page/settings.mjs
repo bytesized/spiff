@@ -17,11 +17,11 @@ export async function init() {
   m_text_button_box.connect_handler("add_agent_tbb", add_agent);
   m_text_button_box.connect_handler("create_agent_tbb", create_agent);
 
-  let default_agent_id = m_agent.get_selected();
+  let default_agent_id = m_agent.k_current.id.get();
   if (default_agent_id != null) {
     let refresh_response = await refresh_agent(default_agent_id);
     if (!refresh_response.success) {
-      m_agent.clear_selected();
+      m_agent.k_current.id.unset();
     }
   }
 
@@ -65,7 +65,7 @@ async function create_agent(box) {
 }
 
 function refresh_list() {
-  let available_agents = m_agent.get_available();
+  let available_agents = m_agent.k_available.ids.get();
   let list_el;
   if (available_agents.length == 0) {
     list_el = document.createElement("span");
@@ -74,11 +74,11 @@ function refresh_list() {
   } else {
     let list_items = [];
     for (const id of available_agents) {
-      let agent_data = m_agent.get_cached_agent_data(id);
-      list_items.push([id, agent_data.call_sign.toLowerCase()]);
+      let call_sign = m_agent.k_available.call_sign.get(id);
+      list_items.push([id, call_sign.toLowerCase()]);
     }
     let options = {delete_handler: remove_agent};
-    let selected = m_agent.get_selected();
+    let selected = m_agent.k_current.id.get();
     if (selected != null) {
       options.selected_id = selected;
     }
@@ -100,7 +100,7 @@ async function select_agent(clicked) {
     return m_error.show_api_failure_popup(refresh_response);
   }
 
-  m_agent.set_selected(clicked.id);
+  m_agent.k_current.id.set(clicked.id);
   // We don't need `m_list.clear_busy(clicked.list)` because `refresh_list()` replaces the whole
   // list element.
   refresh_list();
@@ -108,18 +108,18 @@ async function select_agent(clicked) {
 }
 
 async function refresh_agent(agent_id) {
-  let auth_token = m_agent.get_cached_agent_data(agent_id).auth_token;
+  let auth_token = m_agent.k_available.auth_token.get(agent_id);
   let response = await m_api.get_agent_details(auth_token);
   if (!response.success) {
     return response;
   }
 
-  m_agent.update_cached_agent_data(agent_id, {call_sign: response.payload.data.symbol});
+  m_agent.k_available.call_sign.set(response.payload.data.symbol);
   return response;
 }
 
 async function remove_agent(clicked) {
-  let call_sign = m_agent.get_cached_agent_data(clicked.id).call_sign;
+  let call_sign = m_agent.k_available.call_sign.get(clicked.id);
   let popup_button = await m_popup.show({
     title: "Remove Agent?",
     message:

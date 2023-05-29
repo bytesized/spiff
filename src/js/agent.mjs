@@ -1,110 +1,78 @@
 import * as m_storage from "./storage.mjs";
 
-const k_module_name = "agent";
-// This should be incremented whenever the data format stored in `m_storage` changes.
-const k_module_version = 1;
+const k_agents_version = 1;
+const k_storage = m_storage.create(
+  "agent",
+  k_agents_version,
+  {
+    next_id: {type: m_storage.e_data_type.integer, persist: true},
+    available_agents: {type: m_storage.e_data_type.json, persist: true},
+    call_sign: {keyed: true, type: m_storage.e_data_type.string, persist: true},
+    auth_token: {keyed: true, type: m_storage.e_data_type.string, persist: true},
+    current_agent_id: {type: m_storage.e_data_type.string, persist: true},
+  }
+);
 
-const k_storage = m_storage.create(k_module_name, k_module_version);
+export const k_current = new m_storage.view(
+  k_storage,
+  {
+    id: {from: "current_agent_id"},
+    call_sign: {key_field: "current_agent_id"},
+    auth_token: {key_field: "current_agent_id"},
+  }
+);
 
-const k_next_agent_id_key = "next_agent_id";
+export const k_available = new m_storage.view(
+  k_storage,
+  {
+    ids: {from: "available_agents", readonly: true},
+    call_sign: {},
+    auth_token: {readonly: true},
+  }
+);
+
 const k_initial_agent_id = 0;
-const k_available_agent_list_key = "available_agents";
-const k_agent_data_key_prefix = "agent_data|";
-const k_selected_agent_key = "selected_agent";
 
 function init() {
-  if (!k_storage.has(k_next_agent_id_key)) {
-    k_storage.write_int(k_next_agent_id_key, k_initial_agent_id);
+  if (!k_storage.next_id.is_set()) {
+    k_storage.next_id.set(k_initial_agent_id);
   }
 
-  if (!k_storage.has(k_available_agent_list_key)) {
-    k_storage.write_json(k_available_agent_list_key, []);
+  if (!k_storage.available_agents.is_set()) {
+    k_storage.available_agents.set([]);
   }
-}
-
-/**
- * @returns
- *        A list of string id's.
- */
-export function get_available() {
-  return k_storage.read_json(k_available_agent_list_key);
-}
-
-function set_available(agents) {
-  k_storage.write_json(k_available_agent_list_key, agents);
-}
-
-/**
- * @returns
- *        A string id, or null if no agent is selected.
- */
-export function get_selected() {
-  return k_storage.read(k_selected_agent_key);
-}
-
-export function set_selected(agent_id) {
-  k_storage.write(k_selected_agent_key, agent_id);
-}
-
-export function clear_selected() {
-  k_storage.remove(k_selected_agent_key);
-}
-
-/**
- * @param agent_id
- *        An agent id retrieved via `get_available()` or `get_selected()`.
- * @return
- *        An object with these properties:
- *          auth_token
- *            The token used to authenticate as an agent.
- *          call_sign
- *            The call sign of the agent.
- */
-export function get_cached_agent_data(agent_id) {
-  return k_storage.read_json(k_agent_data_key_prefix + agent_id.toString());
-}
-
-function set_cached_agent_data(agent_id, data) {
-  k_storage.write_json(k_agent_data_key_prefix + agent_id.toString(), data);
-}
-
-export function update_cached_agent_data(agent_id, update) {
-  let existing = get_cached_agent_data(agent_id);
-  set_cached_agent_data(agent_id, Object.assign(existing, update));
-}
-
-function clear_cached_agent_data(agent_id) {
-  k_storage.remove(k_agent_data_key_prefix + agent_id.toString());
 }
 
 export function add(auth_token, call_sign) {
-  let agent_id = k_storage.read_int(k_next_agent_id_key);
-  k_storage.write_int(k_next_agent_id_key, agent_id + 1);
+  let agent_id = k_storage.next_id.get();
+  k_storage.next_id.set(agent_id + 1);
   agent_id = agent_id.toString();
 
-  set_cached_agent_data(agent_id, {auth_token, call_sign});
+  k_storage.auth_token.set(agent_id, auth_token);
+  k_storage.call_sign.set(agent_id, call_sign);
 
-  let available_agents = get_available();
+  let available_agents = k_storage.available_agents.get();
   available_agents.push(agent_id);
-  set_available(available_agents);
+  k_storage.available_agents.set(available_agents);
 
-  if (get_selected() == null) {
-    set_selected(agent_id);
+  if (!k_storage.current_agent_id.is_set()) {
+    k_storage.current_agent_id.set(agent_id);
   }
 
   return agent_id;
 }
 
 export function remove(agent_id) {
-  clear_cached_agent_data(agent_id);
-
-  let available_agents = get_available();
-  available_agents = available_agents.filter(id => id != agent_id);
-  set_available(available_agents);
-
-  if (get_selected() == agent_id) {
-    clear_selected();
+  if (k_storage.current_agent_id.get() == agent_id) {
+    k_storage.current_agent_id.unset();
   }
+
+  k_storage.auth_token.unset(agent_id);
+  k_storage.call_sign.unset(agent_id);
+
+  let available_agents = k_storage.available_agents.get();
+  available_agents = available_agents.filter(id => id != agent_id);
+  k_storage.available_agents.set(available_agents);
 }
 
 init();
