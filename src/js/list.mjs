@@ -2,6 +2,7 @@ import * as m_busy_spinner from "./busy_spinner.mjs";
 
 const k_list_container_class = "list_container";
 const k_selectable_class = "selectable";
+const k_content_class = "content";
 const k_spacer_class = "spacer";
 const k_trash_button_class = "trash";
 const k_selected_item_class = "selected";
@@ -31,7 +32,9 @@ const k_item_id_attribute = "list_id";
  *        If passed, the item with this id will be selected. Otherwise, no item will initially be
  *        selected.
  * @return
- *        The created list element.
+ *        Technically this function returns a container with the list in it rather than the list
+ *        itself, but all functions in this API will accept either the list or the container
+ *        interchangeably.
  */
 export function create_selectable(items, handler, {delete_handler, selected_id} = {}) {
   let container = document.createElement("div");
@@ -55,9 +58,10 @@ export function create_selectable(items, handler, {delete_handler, selected_id} 
     }
     list.append(item_el);
 
-    let contents_container = document.createElement("div");
-    contents_container.append(...item_contents);
-    item_el.append(contents_container);
+    let content_container = document.createElement("div");
+    content_container.classList.add(k_content_class);
+    content_container.append(...item_contents);
+    item_el.append(content_container);
 
     let spacer = document.createElement("div");
     spacer.classList.add(k_spacer_class);
@@ -81,10 +85,14 @@ function get_container(el) {
   return el.closest("." + k_list_container_class);
 }
 
-export function select_item(list, item) {
+export function clear_selection(list) {
   for (const el of list.getElementsByClassName(k_selected_item_class)) {
     el.classList.remove(k_selected_item_class);
   }
+}
+
+export function select_item(item) {
+  clear_selection(get_container(item));
   item.classList.add(k_selected_item_class);
 }
 
@@ -110,4 +118,13 @@ export function clear_busy(list) {
   }
 
   m_busy_spinner.remove_overlay(container);
+}
+
+export function get_item(list, id) {
+  return list.querySelector(`li[${k_item_id_attribute}='${id}']`);
+}
+
+export function set_item_contents(item, ...elements) {
+  let content_container = item.querySelector(`:scope > .${k_content_class}`);
+  content_container.replaceChildren(...elements);
 }

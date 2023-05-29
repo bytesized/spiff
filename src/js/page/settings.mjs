@@ -2,7 +2,6 @@ import * as m_agent from "../agent.mjs";
 import * as m_api from "../api.mjs";
 import * as m_error from "../error.mjs";
 import * as m_list from "../list.mjs";
-import * as m_page from "../page.mjs";
 import * as m_popup from "../popup.mjs";
 import * as m_text_button_box from "../text_button_box.mjs";
 
@@ -12,6 +11,8 @@ const k_create_agent_faction_input_id = "create_agent_faction";
 const k_agent_list_empty_string = "No Agents Found";
 
 const k_invalid_agent_name = 422;
+
+let g_agent_callbacks = {};
 
 export async function init() {
   m_text_button_box.connect_handler("add_agent_tbb", add_agent);
@@ -25,8 +26,57 @@ export async function init() {
     }
   }
 
-  refresh_list();
-  m_page.maybe_enable_navigation();
+  m_agent.k_available.ids.add_change_listener(available_agents => {
+    for (const id in g_agent_callbacks) {
+      m_agent.k_available.call_sign.remove_change_listener(id, g_agent_callbacks[id]);
+    }
+    g_agent_callbacks = {};
+
+    let list_el;
+    if (available_agents.length == 0) {
+      list_el = document.createElement("span");
+      list_el.classList.add("italic");
+      list_el.textContent = k_agent_list_empty_string;
+    } else {
+      let list_items = [];
+      for (const id of available_agents) {
+        let call_sign = m_agent.k_available.call_sign.get(id);
+        list_items.push([id, format_call_sign(call_sign)]);
+      }
+      let options = {delete_handler: remove_agent};
+      let selected = m_agent.k_current.id.get();
+      if (selected != null) {
+        options.selected_id = selected;
+      }
+      list_el = m_list.create_selectable(list_items, select_agent, options);
+
+      for (const id of available_agents) {
+        let callback = new_call_sign => {
+          let item = m_list.get_item(list_el, id);
+          m_list.set_item_contents(item, format_call_sign(new_call_sign));
+        };
+        g_agent_callbacks[id] = callback;
+        m_agent.k_available.call_sign.add_change_listener(id, callback);
+      }
+    }
+    let old_list_el = document.getElementById(k_agent_list_id);
+    list_el.id = k_agent_list_id;
+    old_list_el.replaceWith(list_el);
+  }, {run_immediately: true});
+
+  m_agent.k_current.id.add_change_listener(current_agent => {
+    let list = document.getElementById(k_agent_list_id);
+    if (current_agent == null) {
+      m_list.clear_selection(list);
+    } else {
+      let item = m_list.get_item(list, current_agent);
+      m_list.select_item(item);
+    }
+  });
+}
+
+function format_call_sign(call_sign) {
+  return call_sign.toLowerCase();
 }
 
 async function add_agent(box) {
@@ -37,8 +87,6 @@ async function add_agent(box) {
   }
   let id = m_agent.add(token, response.payload.data.symbol);
   box.input.value = "";
-  refresh_list();
-  m_page.maybe_enable_navigation();
 }
 
 async function create_agent(box) {
@@ -60,51 +108,20 @@ async function create_agent(box) {
   }
   m_agent.add(response.payload.data.token, response.payload.data.agent.symbol);
   box.input.value = "";
-  refresh_list();
-  m_page.maybe_enable_navigation();
-}
-
-function refresh_list() {
-  let available_agents = m_agent.k_available.ids.get();
-  let list_el;
-  if (available_agents.length == 0) {
-    list_el = document.createElement("span");
-    list_el.classList.add("italic");
-    list_el.textContent = k_agent_list_empty_string;
-  } else {
-    let list_items = [];
-    for (const id of available_agents) {
-      let call_sign = m_agent.k_available.call_sign.get(id);
-      list_items.push([id, call_sign.toLowerCase()]);
-    }
-    let options = {delete_handler: remove_agent};
-    let selected = m_agent.k_current.id.get();
-    if (selected != null) {
-      options.selected_id = selected;
-    }
-    list_el = m_list.create_selectable(list_items, select_agent, options);
-  }
-  let old_list_el = document.getElementById(k_agent_list_id);
-  list_el.id = k_agent_list_id;
-  old_list_el.replaceWith(list_el);
 }
 
 async function select_agent(clicked) {
   m_list.set_busy(clicked.list);
-  m_page.disable_navigation();
+  m_agent.k_current.id.unset();
 
   let refresh_response = await refresh_agent(clicked.id);
   if (!refresh_response.success) {
     m_list.clear_busy(clicked.list);
-    m_page.maybe_enable_navigation();
     return m_error.show_api_failure_popup(refresh_response);
   }
 
   m_agent.k_current.id.set(clicked.id);
-  // We don't need `m_list.clear_busy(clicked.list)` because `refresh_list()` replaces the whole
-  // list element.
-  refresh_list();
-  m_page.maybe_enable_navigation();
+  m_list.clear_busy(clicked.list);
 }
 
 async function refresh_agent(agent_id) {
@@ -114,7 +131,7 @@ async function refresh_agent(agent_id) {
     return response;
   }
 
-  m_agent.k_available.call_sign.set(response.payload.data.symbol);
+  m_agent.k_available.call_sign.set(agent_id, response.payload.data.symbol);
   return response;
 }
 
@@ -133,6 +150,4 @@ async function remove_agent(clicked) {
     return;
   }
   m_agent.remove(clicked.id);
-  refresh_list();
-  m_page.maybe_disable_navigation();
 }

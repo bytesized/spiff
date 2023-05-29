@@ -58,16 +58,18 @@ export async function init() {
     }
   }
 
+  m_agent.k_current.id.add_change_listener(current_agent => {
+    if (current_agent == null) {
+      disable_navigation();
+    } else {
+      enable_navigation();
+    }
+  }, {run_immediately: true});
+
   return Promise.allSettled(page_init_fns);
 }
 
-export function maybe_enable_navigation() {
-  if (m_agent.k_current.id.is_set()) {
-    enable_navigation();
-  }
-}
-
-export function enable_navigation() {
+function enable_navigation() {
   for (const page of k_pages) {
     let button = document.getElementById(k_page_button_id[page]);
     button.classList.remove(k_nav_button_disabled_class);
@@ -79,21 +81,17 @@ export function enable_navigation() {
   }
 }
 
-export function maybe_disable_navigation() {
-  if (!m_agent.k_current.id.is_set()) {
-    disable_navigation();
-  }
-}
-
-export function disable_navigation() {
+function disable_navigation() {
   for (const page of k_pages) {
     if (!k_page_disabled_if_no_agent_selected[page]) {
       continue;
     }
     let button = document.getElementById(k_page_button_id[page]);
     button.classList.add(k_nav_button_disabled_class);
-    button.removeEventListener("click", g_button_listener[page]);
-    delete g_button_listener[page];
+    if (page in g_button_listener) {
+      button.removeEventListener("click", g_button_listener[page]);
+      delete g_button_listener[page];
+    }
   }
 }
 
