@@ -1,5 +1,6 @@
 import * as m_agent from "./agent.mjs";
-import * as m_settings from "./page/settings.mjs";
+import * as m_agent_page from "./page/agent.mjs";
+import * as m_settings_page from "./page/settings.mjs";
 
 const k_page_class = "page";
 const k_active_page_class = "active_page";
@@ -22,7 +23,8 @@ const k_page_button_id = {
 };
 
 const k_page_init_fn = {
-  [e_page.settings]: m_settings.init,
+  [e_page.settings]: m_settings_page.init,
+  [e_page.agent]: m_agent_page.init,
 };
 
 const k_page_disabled_if_no_agent_selected = {

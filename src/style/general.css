@@ -44,3 +44,7 @@ button {
   font-size: large;
   vertical-align: middle;
 }
+
+pre.inline_output {
+  display: inline;
+}
