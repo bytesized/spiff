@@ -67,12 +67,12 @@ export function remove(agent_id) {
     k_storage.current_agent_id.unset();
   }
 
-  k_storage.auth_token.unset(agent_id);
-  k_storage.call_sign.unset(agent_id);
-
   let available_agents = k_storage.available_agents.get();
   available_agents = available_agents.filter(id => id != agent_id);
   k_storage.available_agents.set(available_agents);
+
+  k_storage.auth_token.unset(agent_id);
+  k_storage.call_sign.unset(agent_id);
 }
 
 init();
