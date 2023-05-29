@@ -208,7 +208,8 @@ class storage_object {
         this.#on_change_callbacks[field_name] = {};
 
         if (field.persist) {
-          let keys = this.#read_localStorage_json(k_private_scope, k_key_list_key);
+          let keys = this.#read_localStorage_json(k_private_scope,
+                                                  k_key_list_key + "|" + field_name);
           if (keys != null) {
             for (const key of keys) {
               let value = ls_read(k_public_scope, field_name + "|" + key);
@@ -224,7 +225,7 @@ class storage_object {
           update_key_list = () => {
             this.#write_localStorage_json(
               k_private_scope,
-              k_key_list_key,
+              k_key_list_key + "|" + field_name,
               Object.keys(this.#data[field_name])
             );
           };
