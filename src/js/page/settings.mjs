@@ -41,7 +41,7 @@ export async function init() {
       let list_items = [];
       for (const id of available_agents) {
         let call_sign = m_agent.k_available.call_sign.get(id);
-        list_items.push([id, format_call_sign(call_sign)]);
+        list_items.push([id, m_agent.format_call_sign(call_sign)]);
       }
       let options = {delete_handler: remove_agent};
       let selected = m_agent.k_current.id.get();
@@ -53,7 +53,7 @@ export async function init() {
       for (const id of available_agents) {
         let callback = new_call_sign => {
           let item = m_list.get_item(list_el, id);
-          m_list.set_item_contents(item, format_call_sign(new_call_sign));
+          m_list.set_item_contents(item, m_agent.format_call_sign(new_call_sign));
         };
         g_agent_callbacks[id] = callback;
         m_agent.k_available.call_sign.add_change_listener(id, callback);
@@ -75,24 +75,19 @@ export async function init() {
   });
 }
 
-function format_call_sign(call_sign) {
-  return call_sign.toLowerCase();
-}
-
 async function add_agent(box) {
-  let token = box.input.value;
-  let response = await m_api.get_agent_details(token);
+  let auth_token = box.input.value;
+  let response = await m_agent.add(auth_token);
   if (!response.success) {
     return m_error.show_api_failure_popup(response);
   }
-  let id = m_agent.add(token, response.payload.data.symbol);
   box.input.value = "";
 }
 
 async function create_agent(box) {
   let call_sign = document.getElementById(k_create_agent_call_sign_input_id).value;
   let faction = document.getElementById(k_create_agent_faction_input_id).value;
-  let response = await m_api.register_agent(call_sign, faction);
+  let response = await m_agent.create(call_sign, faction);
   if (!response.success) {
     if (response.payload?.error?.code == k_invalid_agent_name) {
       return m_popup.show({
@@ -106,7 +101,6 @@ async function create_agent(box) {
       return m_error.show_api_failure_popup(response);
     }
   }
-  m_agent.add(response.payload.data.token, response.payload.data.agent.symbol);
   box.input.value = "";
 }
 

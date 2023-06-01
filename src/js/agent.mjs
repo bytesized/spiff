@@ -44,7 +44,7 @@ function init() {
   }
 }
 
-export function add(auth_token, call_sign) {
+function add_agent_internal(auth_token, call_sign) {
   let agent_id = k_storage.next_id.get();
   k_storage.next_id.set(agent_id + 1);
   agent_id = agent_id.toString();
@@ -85,6 +85,30 @@ export async function refresh(agent_id) {
 
   k_storage.call_sign.set(agent_id, response.payload.data.symbol);
   return response;
+}
+
+export async function create(call_sign, faction) {
+  let response = await m_api.register_agent(call_sign, faction);
+  if (!response.success) {
+    return response;
+  }
+
+  add_agent_internal(response.payload.data.token, response.payload.data.agent.symbol);
+  return response;
+}
+
+export async function add(auth_token) {
+  let response = await m_api.get_agent_details(auth_token);
+  if (!response.success) {
+    return response;
+  }
+
+  add_agent_internal(auth_token, response.payload.data.symbol);
+  return response;
+}
+
+export function format_call_sign(call_sign) {
+  return call_sign.toLowerCase();
 }
 
 init();
