@@ -20,7 +20,7 @@ export async function init() {
 
   let default_agent_id = m_agent.k_current.id.get();
   if (default_agent_id != null) {
-    let refresh_response = await refresh_agent(default_agent_id);
+    let refresh_response = await m_agent.refresh(default_agent_id);
     if (!refresh_response.success) {
       m_agent.k_current.id.unset();
     }
@@ -114,7 +114,7 @@ async function select_agent(clicked) {
   m_list.set_busy(clicked.list);
   m_agent.k_current.id.unset();
 
-  let refresh_response = await refresh_agent(clicked.id);
+  let refresh_response = await m_agent.refresh(clicked.id);
   if (!refresh_response.success) {
     m_list.clear_busy(clicked.list);
     return m_error.show_api_failure_popup(refresh_response);
@@ -122,17 +122,6 @@ async function select_agent(clicked) {
 
   m_agent.k_current.id.set(clicked.id);
   m_list.clear_busy(clicked.list);
-}
-
-async function refresh_agent(agent_id) {
-  let auth_token = m_agent.k_available.auth_token.get(agent_id);
-  let response = await m_api.get_agent_details(auth_token);
-  if (!response.success) {
-    return response;
-  }
-
-  m_agent.k_available.call_sign.set(agent_id, response.payload.data.symbol);
-  return response;
 }
 
 async function remove_agent(clicked) {

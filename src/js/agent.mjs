@@ -1,3 +1,4 @@
+import * as m_api from "./api.mjs";
 import * as m_storage from "./storage.mjs";
 
 const k_agents_version = 1;
@@ -73,6 +74,17 @@ export function remove(agent_id) {
 
   k_storage.auth_token.unset(agent_id);
   k_storage.call_sign.unset(agent_id);
+}
+
+export async function refresh(agent_id) {
+  let auth_token = k_storage.auth_token.get(agent_id);
+  let response = await m_api.get_agent_details(auth_token);
+  if (!response.success) {
+    return response;
+  }
+
+  k_storage.call_sign.set(agent_id, response.payload.data.symbol);
+  return response;
 }
 
 init();
