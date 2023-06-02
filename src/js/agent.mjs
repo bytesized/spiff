@@ -100,7 +100,7 @@ export async function create(call_sign, faction) {
     return response;
   }
 
-  add_agent_internal(response.payload.data.token, agent_data);
+  add_agent_internal(response.payload.data.token, response.payload.data.agent);
   return response;
 }
 
