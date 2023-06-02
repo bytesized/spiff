@@ -507,3 +507,15 @@ export class view {
     }
   }
 }
+
+export function change_el_text_callback(el_id, unset_message) {
+  const fn = new_value => {
+    let el = document.getElementById(el_id);
+    if (new_value == null) {
+      el.textContent = unset_message;
+    } else {
+      el.textContent = new_value;
+    }
+  };
+  return fn;
+}

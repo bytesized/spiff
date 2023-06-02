@@ -8,15 +8,16 @@
   -->
   <title>Spiff - SpaceTraders Client</title>
   <link rel="icon" type="image/x-icon" href="/img/logo.svg" />
-  <link rel="stylesheet" href="style/general.css" />
-  <link rel="stylesheet" href="style/top_bar.css" />
-  <link rel="stylesheet" href="style/page.css" />
-  <link rel="stylesheet" href="style/dir_box.css" />
-  <link rel="stylesheet" href="style/text_button_box.css" />
-  <link rel="stylesheet" href="style/popup.css" />
   <link rel="stylesheet" href="style/busy_spinner.css" />
+  <link rel="stylesheet" href="style/dir_box.css" />
+  <link rel="stylesheet" href="style/general.css" />
   <link rel="stylesheet" href="style/list.css" />
+  <link rel="stylesheet" href="style/page.css" />
+  <link rel="stylesheet" href="style/page/agent.css" />
+  <link rel="stylesheet" href="style/popup.css" />
   <link rel="stylesheet" href="style/text.css" />
+  <link rel="stylesheet" href="style/text_button_box.css" />
+  <link rel="stylesheet" href="style/top_bar.css" />
 
   <script type="module">
     // This self initializes, but the initialization needs to happen before `DOMContentLoaded`, so
@@ -62,7 +63,22 @@
       </div>
       <div id="agent_page" class="page">
         <h1>Agent Info</h1>
-        <div>Call Sign: <pre id="agent_page_call_sign" class="inline_output"></pre></div>
+        <div class="info_line">
+          Call Sign:
+          <pre id="agent_page_call_sign" class="inline_output"></pre>
+        </div>
+        <div class="info_line">
+          Credits:
+          <pre id="agent_page_credits" class="inline_output"></pre>
+        </div>
+        <div class="info_line">
+          Headquarters:
+          <pre id="agent_page_headquarters" class="inline_output"></pre>
+        </div>
+        <div class="info_line">
+          Starting Faction:
+          <pre id="agent_page_start_faction" class="inline_output"></pre>
+        </div>
       </div>
       <div id="star_chart_page" class="page">
         <h1>Star Chart</h1>
