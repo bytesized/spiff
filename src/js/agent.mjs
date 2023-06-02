@@ -100,12 +100,6 @@ export async function create(call_sign, faction) {
     return response;
   }
 
-  // The create API is a little differently formatted than the response to `get_agent_details`.
-  let agent_data = {
-    ...response.payload.data.agent,
-    startingFaction: response.payload.data.faction.symbol,
-  };
-
   add_agent_internal(response.payload.data.token, agent_data);
   return response;
 }
