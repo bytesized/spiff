@@ -234,7 +234,11 @@ class storage_object {
         let run_callbacks = (key, value) => {
           if (key in this.#on_change_callbacks[field_name]) {
             for (const callback of this.#on_change_callbacks[field_name][key]) {
-              callback(value);
+              try {
+                callback(value);
+              } catch (e) {
+                console.error(e);
+              }
             }
           }
         };
@@ -447,7 +451,11 @@ export class view {
         this.#old_key_value[field_name] = storage[field.key_field].get();
         let run_callbacks = new_value => {
           for (const callback of this.#on_change_callbacks[field_name]) {
-            callback(new_value);
+            try {
+              callback(new_value);
+            } catch (e) {
+              console.error(e);
+            }
           }
         };
         storage[field.key_field].add_change_listener(new_value => {
