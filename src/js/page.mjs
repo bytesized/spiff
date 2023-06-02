@@ -44,10 +44,10 @@ const k_page_el_id = {
 const g_button_listener = {};
 
 export async function init() {
-  let page_init_fns = [];
+  let init_promises = [];
   for (const page of k_pages) {
     if (page in k_page_init_fn) {
-      page_init_fns.push(k_page_init_fn[page]());
+      init_promises.push(k_page_init_fn[page]());
     }
   }
 
@@ -60,15 +60,19 @@ export async function init() {
     }
   }
 
-  m_agent.k_current.id.add_change_listener(current_agent => {
-    if (current_agent == null) {
-      disable_navigation();
-    } else {
-      enable_navigation();
-    }
-  }, {run_immediately: true});
+  init_promises.push((async () => {
+    await m_agent.init();
 
-  return Promise.allSettled(page_init_fns);
+    m_agent.k_current.id.add_change_listener(current_agent => {
+      if (current_agent == null) {
+        disable_navigation();
+      } else {
+        enable_navigation();
+      }
+    }, {run_immediately: true});
+  })());
+
+  return Promise.allSettled(init_promises);
 }
 
 function enable_navigation() {

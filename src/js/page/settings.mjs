@@ -17,13 +17,7 @@ export async function init() {
   m_text_button_box.connect_handler("add_agent_tbb", add_agent);
   m_text_button_box.connect_handler("create_agent_tbb", create_agent);
 
-  let default_agent_id = m_agent.k_current.id.get();
-  if (default_agent_id != null) {
-    let refresh_response = await m_agent.refresh(default_agent_id);
-    if (!refresh_response.success) {
-      m_agent.k_current.id.unset();
-    }
-  }
+  await m_agent.init();
 
   m_agent.k_available.ids.add_change_listener(available_agents => {
     for (const id in g_agent_callbacks) {
@@ -105,16 +99,11 @@ async function create_agent(box) {
 
 async function select_agent(clicked) {
   m_list.set_busy(clicked.list);
-  m_agent.k_current.id.unset();
-
-  let refresh_response = await m_agent.refresh(clicked.id);
-  if (!refresh_response.success) {
-    m_list.clear_busy(clicked.list);
-    return m_error.show_api_failure_popup(refresh_response);
-  }
-
-  m_agent.k_current.id.set(clicked.id);
+  let agent_info_response = await m_agent.set_current(clicked.id);
   m_list.clear_busy(clicked.list);
+  if (!agent_info_response.success) {
+    await m_error.show_api_failure_popup(refresh_response);
+  }
 }
 
 async function remove_agent(clicked) {
