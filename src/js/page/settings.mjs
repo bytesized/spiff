@@ -102,7 +102,7 @@ async function select_agent(clicked) {
   let agent_info_response = await m_agent.set_current(clicked.id);
   m_list.clear_busy(clicked.list);
   if (!agent_info_response.success) {
-    await m_error.show_api_failure_popup(refresh_response);
+    await m_error.show_api_failure_popup(agent_info_response);
   }
 }
 
