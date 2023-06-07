@@ -1,0 +1,31 @@
+/* Because this relies on `position: absolute`, the parent needs to be a positioned element. */
+.progress_container {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  container-type: size;
+  container-name: resize-box;
+}
+
+.progress_container canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1/1;
+  margin: auto;
+}
+
+/*
+ * This allows the progress bar to occupy as much space as possible while retaining the correct
+ * aspect ratio.
+ */
+@container resize-box (aspect-ratio > 1/1) {
+  .progress_container canvas {
+    width: auto;
+    height: 100%;
+  }
+}
