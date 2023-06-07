@@ -35,6 +35,7 @@
   right: 0;
   margin: 0;
   padding: 0;
+  display: flex;
   border-width: 0;
   container-type: size;
   container-name: resize-box;
