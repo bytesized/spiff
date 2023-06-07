@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="style/page.css" />
   <link rel="stylesheet" href="style/page/agent.css" />
   <link rel="stylesheet" href="style/popup.css" />
+  <link rel="stylesheet" href="style/progress.css" />
   <link rel="stylesheet" href="style/text.css" />
   <link rel="stylesheet" href="style/text_button_box.css" />
   <link rel="stylesheet" href="style/top_bar.css" />
@@ -37,13 +38,21 @@
   <div class="vbox">
     <div id="top_bar">
       <div id="navigation_container">
-        <img id="agent_icon" class="disabled" src="img/agent.svg" alt="Agent Button" />
+        <div id="agent_icon" class="nav_icon disabled">
+          <img src="img/agent.svg" alt="Agent Button" />
+        </div>
         <div class="spacer"></div>
-        <img id="star_chart_icon" class="disabled" src="img/star_chart.svg" alt="Star Chart Button" />
+        <div id="star_chart_icon" class="nav_icon disabled">
+          <img src="img/star_chart.svg" alt="Star Chart Button" />
+        </div>
         <div class="spacer"></div>
-        <img id="ship_icon" class="disabled" src="img/logo.svg" alt="Ships Button" />
+        <div id="ship_icon" class="nav_icon disabled">
+          <img class="disabled" src="img/logo.svg" alt="Ships Button" />
+        </div>
         <div class="spacer"></div>
-        <img id="settings_icon" class="nav_button" src="img/gear.svg" alt="Settings Button" />
+        <div id="settings_icon" class="nav_icon">
+          <img src="img/gear.svg" alt="Settings Button" />
+        </div>
       </div>
     </div>
     <div id="page_container">

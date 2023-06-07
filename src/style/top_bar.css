@@ -26,14 +26,22 @@
   flex: 1;
 }
 
-#top_bar img {
-  height: 100%;
-  border-radius: 0.5rem;
-  cursor: pointer;
+#navigation_container .nav_icon {
   flex: 0;
+  height: 100%;
+  cursor: pointer;
+  position: relative;
 }
 
-#top_bar img.disabled {
-  filter: contrast(30%);
+#navigation_container img {
+  height: 100%;
+  border-radius: 0.5rem;
+}
+
+#navigation_container .nav_icon.disabled {
   cursor: default;
+}
+
+#navigation_container .nav_icon.disabled img {
+  filter: contrast(30%);
 }
