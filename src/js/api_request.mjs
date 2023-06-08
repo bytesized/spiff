@@ -28,8 +28,9 @@ const k_request_error_default_message = {
   [e_request_error.status_code]: "Unexpected status code.",
 };
 
-// FIFO queue. Element format defined in `dispatch()`.
-let g_request_queue = [];
+// An array of FIFO queues. Element format defined in `dispatch()`. Queues at lower indicies have
+// higher priority.
+let g_request_queues = [];
 // FIFO queue. Elements are timestamps representing the times that previous requests were received
 // by the server, stored as milliseconds since the epoch.
 // Items are added to this queue when the response is received, not when the request is sent.
@@ -64,6 +65,10 @@ let g_no_requests_until_after = null;
  *        The Bearer Token used to authenticate as the currently selected agent.
  * @param body
  *        This will be passed to `JSON.stringify` and then to `fetch` via its `options` parameter.
+ * @param priority
+ *        The priority at which the request will be serviced. The most priority is given to
+ *        requests with priority `0`, which is the default. Higher priority values are serviced
+ *        only after lower priority valued requests have completed.
  * @return
  *        The return value will be an object with the following fields:
  *          success
@@ -82,11 +87,17 @@ let g_no_requests_until_after = null;
  *            This will be present if `!success` and an error code was provided in the response
  *            JSON sent by the server.
  */
-export async function dispatch(path, {method, auth_token, body} = {}) {
+export async function dispatch(path, {method, auth_token, body, priority} = {}) {
   return new Promise(resolve => {
     let request = {path, method, auth_token, body, callback: resolve};
-    g_request_queue.push(request);
-    k_log.debug("Added API call to", path, "to the queue.");
+    if (!priority) {
+      priority = 0;
+    }
+    while (g_request_queues.length <= priority) {
+      g_request_queues.push([]);
+    }
+    g_request_queues[priority].push(request);
+    k_log.debug("Added API call to", path, "to the priority", priority, "queue.");
     maybe_begin_processing();
   });
 }
@@ -100,9 +111,27 @@ function maybe_begin_processing() {
   }
 }
 
+function are_unprocessed_requests() {
+  for (const queue of g_request_queues) {
+    if (queue.length > 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function shift_next_unprocessed_request() {
+  for (let priority = 0; priority < g_request_queues.length; ++priority) {
+    if (g_request_queues[priority].length > 0) {
+      return [priority, g_request_queues[priority].shift()];
+    }
+  }
+  throw new Error(`Attempted to shift next request but there isn't one.`);
+}
+
 function process_queue() {
   g_is_processing_queue = true;
-  while (g_request_queue.length > 0) {
+  while (are_unprocessed_requests()) {
     let now = Date.now();
     k_log.debug("Queue processing in-progress at", now);
 
@@ -149,17 +178,9 @@ function process_queue() {
       return;
     }
 
-    let request = g_request_queue.shift();
-    k_log.info("Dispatching request to", request.path);
+    const [priority, request] = shift_next_unprocessed_request();
+    k_log.info("Dispatching request to", request.path, "(priority=", priority, ")");
     g_in_flight_count += 1;
-    let on_response = (response, request_received) => {
-      g_in_flight_count -= 1;
-      g_past_requests.push(request_received);
-      k_log.debug("Response from", request.path, "received at", () => Date.now(),
-                  ". Server received it at ", request_received);
-      maybe_begin_processing();
-      request.callback(response);
-    };
 
     const api_endpoint = "https://api.spacetraders.io/v2/" + request.path;
     const options = {
@@ -184,10 +205,11 @@ function process_queue() {
         g_in_flight_count -= 1;
 
         let received_time = Date.now();
+        g_past_requests.push(received_time);
 
         // Originally we set the rate limit any time `retry-after` was specified. But it seems to
         // specify it way more often than necessary.
-        let should_rate_limit = (status == 429);
+        let should_rate_limit = (response.status == 429);
 
         if (should_rate_limit) {
           let retry_at = null;
@@ -230,7 +252,7 @@ function process_queue() {
         }
 
         if (response.status == 429) {
-          g_request_queue.unshift(request);
+          g_request_queues[priority].unshift(request);
           k_log.warn("HTTP 429 - Need to retry request");
           maybe_begin_processing();
           return;
