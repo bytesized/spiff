@@ -1,10 +1,12 @@
 import * as m_agent from "./agent.mjs";
 import * as m_agent_page from "./page/agent.mjs";
+import * as m_progress from "./progress.mjs";
 import * as m_settings_page from "./page/settings.mjs";
 
 const k_page_class = "page";
 const k_active_page_class = "active_page";
 const k_nav_button_disabled_class = "disabled";
+const k_active_page_selector = `.${k_page_class}.${k_active_page_class}`;
 
 const e_page = {
   agent: "e_page::agent",
@@ -23,8 +25,8 @@ const k_page_button_id = {
 };
 
 const k_page_init_fn = {
-  [e_page.settings]: m_settings_page.init,
-  [e_page.agent]: m_agent_page.init,
+  [e_page.settings]: {fn: m_settings_page.init},
+  [e_page.agent]: {fn: m_agent_page.init},
 };
 
 const k_page_disabled_if_no_agent_selected = {
@@ -42,12 +44,16 @@ const k_page_el_id = {
 };
 
 const g_button_listener = {};
+const g_inited_pages = [];
+let g_page_module_init_done = false;
 
 export async function init() {
   let init_promises = [];
   for (const page of k_pages) {
     if (page in k_page_init_fn) {
-      init_promises.push(k_page_init_fn[page]());
+      init_promises.push(init_page(page));
+    } else {
+      g_inited_pages.push(page);
     }
   }
 
@@ -70,20 +76,45 @@ export async function init() {
         enable_navigation();
       }
     }, {run_immediately: true});
+
+    g_page_module_init_done = true;
   })());
 
   return Promise.allSettled(init_promises);
 }
 
-function enable_navigation() {
-  for (const page of k_pages) {
+async function init_page(page) {
+  let args = [];
+  let progress_el;
+  if (k_page_init_fn[page].progress) {
+    progress_el = m_progress.create({padding: "0.1rem"});
     let button = document.getElementById(k_page_button_id[page]);
-    button.classList.remove(k_nav_button_disabled_class);
-    if (!(page in g_button_listener)) {
-      let callback = show_page.bind(null, page);
-      g_button_listener[page] = callback;
-      button.addEventListener("click", callback);
-    }
+    button.append(progress_el);
+    args.push(progress_el);
+  }
+  await k_page_init_fn[page].fn(...args);
+  if (progress_el) {
+    progress_el.remove();
+  }
+  g_inited_pages.push(page);
+  if (g_page_module_init_done && m_agent.k_current.id.is_set()) {
+    enable_button(page);
+  }
+}
+
+function enable_navigation() {
+  for (const page of g_inited_pages) {
+    enable_button(page);
+  }
+}
+
+function enable_button(page) {
+  let button = document.getElementById(k_page_button_id[page]);
+  button.classList.remove(k_nav_button_disabled_class);
+  if (!(page in g_button_listener)) {
+    let callback = show_page.bind(null, page);
+    g_button_listener[page] = callback;
+    button.addEventListener("click", callback);
   }
 }
 
@@ -92,17 +123,21 @@ function disable_navigation() {
     if (!k_page_disabled_if_no_agent_selected[page]) {
       continue;
     }
-    let button = document.getElementById(k_page_button_id[page]);
-    button.classList.add(k_nav_button_disabled_class);
-    if (page in g_button_listener) {
-      button.removeEventListener("click", g_button_listener[page]);
-      delete g_button_listener[page];
-    }
+    disable_button(page);
+  }
+}
+
+function disable_button(page) {
+  let button = document.getElementById(k_page_button_id[page]);
+  button.classList.add(k_nav_button_disabled_class);
+  if (page in g_button_listener) {
+    button.removeEventListener("click", g_button_listener[page]);
+    delete g_button_listener[page];
   }
 }
 
 function show_page(page) {
-  for (const active_page of document.querySelectorAll(`.${k_page_class}.${k_active_page_class}`)) {
+  for (const active_page of document.querySelectorAll(k_active_page_selector)) {
     active_page.classList.remove(k_active_page_class);
   }
   let page_el = document.getElementById(k_page_el_id[page]);
