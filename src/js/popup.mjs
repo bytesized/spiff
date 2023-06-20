@@ -12,27 +12,27 @@ let g_overlay_handler = null;
 export const k_closed_by_escape_key = "popup_closed_by_escape_key";
 let g_document_keydown_handler = null;
 
-export const e_button = {
+export const e_button = Object.freeze({
   close: "e_button::close",
   ok: "e_button::ok",
   yes: "e_button::yes",
   no: "e_button::no",
-};
+});
 
-const k_button_properties = {
-  [e_button.close]: {
+const k_button_properties = Object.freeze({
+  [e_button.close]: Object.freeze({
     text: "Close",
-  },
-  [e_button.ok]: {
+  }),
+  [e_button.ok]: Object.freeze({
     text: "Ok",
-  },
-  [e_button.yes]: {
+  }),
+  [e_button.yes]: Object.freeze({
     text: "Yes",
-  },
-  [e_button.no]: {
+  }),
+  [e_button.no]: Object.freeze({
     text: "No",
-  },
-};
+  }),
+});
 
 // Unlike the `init` functions in most other modules, this one ought to be called before the
 // `DOMContentLoaded` event.

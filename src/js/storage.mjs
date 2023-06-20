@@ -358,7 +358,7 @@ function setup_database(event) {
  */
 export async function create(store_name, store_version, description) {
   k_log.debug("create - Creating data store", store_name);
-  Object.freeze(description);
+  deep_freeze(description);
 
   await init();
 

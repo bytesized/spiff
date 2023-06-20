@@ -1,10 +1,10 @@
-export const e_log_level = {
+export const e_log_level = Object.freeze({
   debug: 1,
   info: 2,
   warn: 3,
   error: 4,
   none: 5,
-};
+});
 
 export class logger {
   constructor(log_level, prefix) {

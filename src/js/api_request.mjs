@@ -12,21 +12,21 @@ const k_past_requests_to_track_count = Math.max(...k_request_limits.map(l => l[0
 const k_max_in_flight = Math.min(...k_request_limits.map(l => l[0]));
 const k_duration_to_track_ms = Math.max(...k_request_limits.map(l => l[1]));
 
-export const e_request_error = {
+export const e_request_error = Object.freeze({
   exception: "e_request_error::exception",
   json: "e_request_error::json",
   client: "e_request_error::client",
   server: "e_request_error::server",
   status_code: "e_request_error::status_code",
-};
+});
 
-const k_request_error_default_message = {
+const k_request_error_default_message = Object.freeze({
   [e_request_error.exception]: "fetch() threw an exception.",
   [e_request_error.json]: "Server response was not valid JSON.",
   [e_request_error.client]: "Client Error - Something was wrong with the API request made.",
   [e_request_error.server]: "Server Error",
   [e_request_error.status_code]: "Unexpected status code.",
-};
+});
 
 // An array of FIFO queues. Element format defined in `dispatch()`. Queues at lower indicies have
 // higher priority.

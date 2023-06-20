@@ -9,12 +9,12 @@ const k_active_page_class = "active_page";
 const k_nav_button_disabled_class = "disabled";
 const k_active_page_selector = `.${k_page_class}.${k_active_page_class}`;
 
-const e_page = {
+const e_page = Object.freeze({
   agent: "e_page::agent",
   star_chart: "e_page::star_chart",
   ships: "e_page::ships",
   settings: "e_page::settings",
-};
+});
 
 const k_pages = Object.values(e_page);
 
@@ -25,24 +25,24 @@ const k_page_button_id = {
   [e_page.settings]: "settings_icon",
 };
 
-const k_page_init_fn = {
+const k_page_init_fn = Object.freeze({
   [e_page.settings]: {fn: m_settings_page.init},
   [e_page.agent]: {fn: m_agent_page.init},
-};
+});
 
-const k_page_disabled_if_no_agent_selected = {
+const k_page_disabled_if_no_agent_selected = Object.freeze({
   [e_page.agent]: true,
   [e_page.star_chart]: true,
   [e_page.ships]: true,
   [e_page.settings]: false,
-};
+});
 
-const k_page_el_id = {
+const k_page_el_id = Object.freeze({
   [e_page.agent]: "agent_page",
   [e_page.star_chart]: "star_chart_page",
   [e_page.ships]: "ships_page",
   [e_page.settings]: "settings_page",
-};
+});
 
 const g_button_listener = {};
 const g_inited_pages = [];
