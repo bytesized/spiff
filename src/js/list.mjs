@@ -45,44 +45,18 @@ export function create_selectable(items, handler, {delete_handler, selected_id} 
   container.append(list);
 
   for (const [item_id, ...item_contents] of items) {
-    let item_el = document.createElement("li");
-    let handler_arg = {list, item: item_el, id: item_id};
-    item_el.setAttribute(k_item_id_attribute, item_id);
-    item_el.addEventListener("click", async event => {
-      event = event || window.event;
-      event.stopPropagation();
-      await handler(handler_arg);
-    });
-    if (selected_id == item_id) {
-      item_el.classList.add(k_selected_item_class);
-    }
-    list.append(item_el);
-
-    let content_container = document.createElement("div");
-    content_container.classList.add(k_content_class);
-    content_container.append(...item_contents);
-    item_el.append(content_container);
-
-    let spacer = document.createElement("div");
-    spacer.classList.add(k_spacer_class);
-    item_el.append(spacer);
-
-    if (delete_handler) {
-      let trash_button = document.createElement("button");
-      trash_button.classList.add(k_trash_button_class);
-      trash_button.addEventListener("click", async event => {
-        event = event || window.event;
-        event.stopPropagation();
-        await delete_handler(handler_arg);
-      });
-      item_el.append(trash_button);
-    }
+    add_item_internal(list, item_id, item_contents, handler,
+                      {delete_handler, selected: item_id == selected_id});
   }
   return container;
 }
 
 function get_container(el) {
   return el.closest("." + k_list_container_class);
+}
+
+function get_list(el) {
+  return get_container(el).children[0];
 }
 
 export function clear_selection(list) {
@@ -108,7 +82,6 @@ export function set_busy(list) {
 
   let s = m_busy_spinner.create({with_overlay: true});
   container.append(s);
-  s.id = "foobar";
 }
 
 export function clear_busy(list) {
@@ -127,4 +100,52 @@ export function get_item(list, id) {
 export function set_item_contents(item, ...elements) {
   let content_container = item.querySelector(`:scope > .${k_content_class}`);
   content_container.replaceChildren(...elements);
+}
+
+export function add_item(list, id, item_contents, handler, {delete_handler, selected} = {}) {
+  add_item_internal(get_list(list), id, item_contents, handler, {delete_handler, selected});
+}
+
+function add_item_internal(list, id, item_contents, handler, {delete_handler, selected} = {}) {
+  let item_el = document.createElement("li");
+  let handler_arg = {list, item: item_el, id};
+  item_el.setAttribute(k_item_id_attribute, id);
+  item_el.addEventListener("click", async event => {
+    event = event || window.event;
+    event.stopPropagation();
+    await handler(handler_arg);
+  });
+  if (selected) {
+    item_el.classList.add(k_selected_item_class);
+  }
+  list.append(item_el);
+
+  let content_container = document.createElement("div");
+  content_container.classList.add(k_content_class);
+  content_container.append(...item_contents);
+  item_el.append(content_container);
+
+  let spacer = document.createElement("div");
+  spacer.classList.add(k_spacer_class);
+  item_el.append(spacer);
+
+  if (delete_handler) {
+    let trash_button = document.createElement("button");
+    trash_button.classList.add(k_trash_button_class);
+    trash_button.addEventListener("click", async event => {
+      event = event || window.event;
+      event.stopPropagation();
+      await delete_handler(handler_arg);
+    });
+    item_el.append(trash_button);
+  }
+}
+
+export function remove_item(list, id) {
+  const item = get_item(list, id);
+  item.remove();
+}
+
+export function item_count(list) {
+  return get_list(list).children.length;
 }

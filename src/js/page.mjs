@@ -2,6 +2,7 @@ import * as m_agent from "./agent.mjs";
 import * as m_agent_page from "./page/agent.mjs";
 import * as m_progress from "./progress.mjs";
 import * as m_settings_page from "./page/settings.mjs";
+import * as m_storage from "./storage.mjs";
 
 const k_page_class = "page";
 const k_active_page_class = "active_page";
@@ -69,13 +70,21 @@ export async function init() {
   init_promises.push((async () => {
     await m_agent.init();
 
-    m_agent.k_current.id.add_change_listener(current_agent => {
-      if (current_agent == null) {
-        disable_navigation();
-      } else {
-        enable_navigation();
-      }
-    }, {run_immediately: true});
+    m_agent.agents.add_change_listener(new m_storage.change_listener({
+      selected_only: true,
+      properties: ["id"],
+      callback: event => {
+        if (event.selection_set) {
+          enable_navigation();
+        } else {
+          disable_navigation();
+        }
+      },
+    }));
+    const selected_agent = await m_agent.agents.get_selection_key();
+    if (selected_agent != null) {
+      enable_navigation();
+    }
 
     g_page_module_init_done = true;
   })());
@@ -97,7 +106,9 @@ async function init_page(page) {
     progress_el.remove();
   }
   g_inited_pages.push(page);
-  if (g_page_module_init_done && m_agent.k_current.id.is_set()) {
+
+  const selected_agent = await m_agent.agents.get_selection_key();
+  if (g_page_module_init_done && selected_agent != null) {
     enable_button(page);
   }
 }
