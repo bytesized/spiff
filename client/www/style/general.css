@@ -14,6 +14,7 @@ body {
   background-color: var(--background_color);
   color: var(--text_color);
   font-size: large;
+  min-height: 100vh;
 }
 
 body > div {

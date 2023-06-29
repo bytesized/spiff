@@ -1,0 +1,26 @@
+{
+  "name": "spiff",
+  "version": "0.0.1",
+  "description": "SpaceTraders client",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bytesized/spiff"
+  },
+  "keywords": [
+    "spiff",
+    "SpaceTraders"
+  ],
+  "author": "bytesized",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/bytesized/spiff/issues"
+  },
+  "homepage": "https://github.com/bytesized/spiff#readme",
+  "dependencies": {
+    "minimist": "^1.2.8"
+  }
+}
