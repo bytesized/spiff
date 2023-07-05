@@ -2,9 +2,9 @@
   "name": "spiff",
   "version": "0.0.1",
   "description": "SpaceTraders client",
-  "main": "app.js",
+  "main": "app.mjs",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.mjs"
   },
   "repository": {
     "type": "git",
@@ -21,6 +21,8 @@
   },
   "homepage": "https://github.com/bytesized/spiff#readme",
   "dependencies": {
-    "minimist": "^1.2.8"
+    "minimist": "^1.2.8",
+    "sqlite": "^4.2.1",
+    "sqlite3": "^5.1.6"
   }
 }

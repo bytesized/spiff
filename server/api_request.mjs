@@ -1,6 +1,7 @@
 import * as m_log from "./log.mjs";
+import * as m_request_shared from "../client/www/js/request_shared.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.warn, "api_request");
+const k_log = new m_log.logger(m_log.e_log_level.warn, "server/api_request");
 
 // Server request rate limits.
 const k_request_limits = [
@@ -11,22 +12,6 @@ const k_request_limits = [
 const k_past_requests_to_track_count = Math.max(...k_request_limits.map(l => l[0]));
 const k_max_in_flight = Math.min(...k_request_limits.map(l => l[0]));
 const k_duration_to_track_ms = Math.max(...k_request_limits.map(l => l[1]));
-
-export const e_request_error = Object.freeze({
-  exception: "e_request_error::exception",
-  json: "e_request_error::json",
-  client: "e_request_error::client",
-  server: "e_request_error::server",
-  status_code: "e_request_error::status_code",
-});
-
-const k_request_error_default_message = Object.freeze({
-  [e_request_error.exception]: "fetch() threw an exception.",
-  [e_request_error.json]: "Server response was not valid JSON.",
-  [e_request_error.client]: "Client Error - Something was wrong with the API request made.",
-  [e_request_error.server]: "Server Error",
-  [e_request_error.status_code]: "Unexpected status code.",
-});
 
 // An array of FIFO queues. Element format defined in `dispatch()`. Queues at lower indicies have
 // higher priority.
@@ -58,6 +43,9 @@ let g_no_requests_until_after = null;
  *
  * @param path
  *        The path to the API endpoint, not including the "/v2/" prefix.
+ * @param query
+ *        The query string to be used in the URL, if any. The leading `?` character should not be
+ *        included.
  * @param method
  *        The REST method to pass to `fetch` via its `options` parameter. If this is unspecified
  *        but `body` is, this will be set to "POST" automatically.
@@ -77,8 +65,8 @@ let g_no_requests_until_after = null;
  *            An object created by parsing the JSON response from the server.
  *            This will not be present if the server does not respond with valid JSON.
  *          error_type (optional)
- *            One of the values from the `e_request_error` enum. This will be present if
- *            `!success`.
+ *            One of the values from the `m_request_shared.e_request_error` enum. This will be
+ *            present if `!success`.
  *          error_message (optional)
  *            A string containing a human-readable explanation of what went wrong. This will be
  *            present if `!success`.
@@ -87,11 +75,14 @@ let g_no_requests_until_after = null;
  *            This will be present if `!success` and an error code was provided in the response
  *            JSON sent by the server.
  */
-export async function dispatch(path, {method, auth_token, body, priority} = {}) {
+export async function dispatch(path, {query, method, auth_token, body, priority} = {}) {
   return new Promise(resolve => {
-    let request = {path, method, auth_token, body, callback: resolve};
+    let request = {path, query, method, auth_token, body, callback: resolve};
     if (!priority) {
       priority = 0;
+    }
+    if (priority < 0) {
+      throw new Error(`Invalid priority: ${priority}`);
     }
     while (g_request_queues.length <= priority) {
       g_request_queues.push([]);
@@ -182,7 +173,11 @@ function process_queue() {
     k_log.info("Dispatching request to", request.path, "(priority=", priority, ")");
     g_in_flight_count += 1;
 
-    const api_endpoint = "https://api.spacetraders.io/v2/" + request.path;
+    const api_endpoint = new URL("https://api.spacetraders.io");
+    api_endpoint.pathname = "v2/" + request.path;
+    if (request.query) {
+      api_endpoint.search = "?" + request.query;
+    }
     const options = {
       headers: {
         "Content-Type": "application/json",
@@ -200,12 +195,13 @@ function process_queue() {
     if (request.body) {
       options.body = JSON.stringify(request.body);
     }
-    fetch(api_endpoint, options).then(
+    fetch(api_endpoint.href, options).then(
       async response => {
         g_in_flight_count -= 1;
 
-        let received_time = Date.now();
-        g_past_requests.push(received_time);
+        const response_received_time = Date.now();
+        const response_sent_time = get_single_header(response, "date", response_received_time);
+        g_past_requests.push(response_received_time);
 
         // Originally we set the rate limit any time `retry-after` was specified. But it seems to
         // specify it way more often than necessary.
@@ -219,7 +215,7 @@ function process_queue() {
             if (isNaN(retry_delay)) {
               k_log.warn("retry-after header has a non-integer value:", retry_header);
             } else {
-              retry_at = received_time + (retry_delay * 1000)
+              retry_at = response_sent_time + (retry_delay * 1000)
             }
           }
           if (retry_at == null) {
@@ -245,7 +241,7 @@ function process_queue() {
               () => get_single_header(response, "x-ratelimit-limit-burst", "[unknown]"), "per",
               () => get_single_header(response, "x-ratelimit-limit-per-second", "[unknown]"),
               "sec. Retrying in",
-              () => g_no_requests_until_after - received_time,
+              () => g_no_requests_until_after - response_received_time,
               "ms"
             );
           }
@@ -258,7 +254,8 @@ function process_queue() {
           return;
         }
 
-        k_log.info("Response from", request.path, "received at", received_time);
+        k_log.info("Response from", request.path, "sent at", response_sent_time, "received at",
+                   response_received_time);
         let result = {success: response.ok};
         try {
           result.payload = await response.json();
@@ -266,7 +263,7 @@ function process_queue() {
           k_log.warn("Failed to parse response JSON");
           if (result.success) {
             result.success = false;
-            result.error_type = e_request_error.json;
+            result.error_type = m_request_shared.e_request_error.json;
           }
         }
         if (!result.success) {
@@ -275,14 +272,15 @@ function process_queue() {
           }
           result.error_code = result?.payload?.error?.code;
           if (response.status >= 400 && response.status <= 499) {
-            result.error_type = e_request_error.client;
+            result.error_type = m_request_shared.e_request_error.client;
           } else if (response.status >= 500 && response.status <= 599) {
-            result.error_type = e_request_error.server;
+            result.error_type = m_request_shared.e_request_error.server;
           } else {
-            result.error_type = e_request_error.status_code;
+            result.error_type = m_request_shared.e_request_error.status_code;
           }
           if (!result.error_message) {
-            result.error_message = k_request_error_default_message[result.error_type];
+            result.error_message =
+              m_request_shared.k_request_error_default_message[result.error_type];
           }
           k_log.warn("Request failed", response);
         }
@@ -290,11 +288,12 @@ function process_queue() {
         request.callback(result);
       },
       ex => {
+        k_log.error("Failed to send request", ex);
         g_in_flight_count -= 1;
 
         let result = {success: false};
-        result.error_type = e_request_error.exception;
-        result.error_message = k_request_error_default_message[result.error_type];
+        result.error_type = m_request_shared.e_request_error.server_exception;
+        result.error_message = m_request_shared.k_request_error_default_message[result.error_type];
 
         maybe_begin_processing();
         request.callback(result);

@@ -44,10 +44,6 @@ const k_store_version_version_prop = "version";
 const k_store_entry_selection_key_prop = "key";
 const k_store_entry_selection_value_prop = "value";
 
-export const k_agent_store_name = "agent";
-export const k_agent_id_prop = "id";
-export const k_agent_current_store_name = "current_agent";
-
 async function init() {
   if (g_init_promise != null) {
     return g_init_promise;
@@ -124,17 +120,17 @@ async function init() {
 
 // This probably won't be used anywhere, but is useful for manual testing.
 export async function clobber() {
-  k_log.debug("clobber - Start");
+  k_log.error("clobber - Start");
   try {
     await init();
   } catch (ex) {}
   try {
     g_db.close();
   } catch (ex) {
-    k_log.info("clobber - Failed to close database", ex);
+    k_log.error("clobber - Failed to close database", ex);
   }
 
-  k_log.debug("clobber - Deleting database.");
+  k_log.error("clobber - Deleting database.");
   return new Promise((resolve, reject) => {
     const request = window.indexedDB.deleteDatabase(k_db_name);
     request.addEventListener("error", event => {
@@ -142,7 +138,7 @@ export async function clobber() {
       reject(new Error("Failed to delete database"));
     })
     request.addEventListener("success", event => {
-      k_log.info("clobber - Database deleted");
+      k_log.error("clobber - Database deleted");
       resolve();
     });
   });
@@ -193,8 +189,6 @@ function setup_database(event) {
 
   if (event.oldVersion < 1) {
     db.createObjectStore(k_store_version_store_name, {keyPath: k_store_version_store_name_prop});
-    db.createObjectStore(k_agent_store_name, {keyPath: k_agent_id_prop, autoIncrement: true});
-    db.createObjectStore(k_agent_current_store_name, {keyPath: k_store_entry_selection_key_prop});
   }
 
   db.removeEventListener("error", setup_error_handler);
@@ -615,7 +609,7 @@ class store_object {
         try {
           listener.callback(listener.public_context ? public_callback_arg : callback_arg);
         } catch (ex) {
-          k_log.error("Listener through exception", ex);
+          k_log.error("Listener threw exception", ex);
         }
       }
     }
@@ -720,11 +714,13 @@ class store_object {
       await complete_promise;
       k_log.debug("Add transaction complete", request);
       storage_key = request.result;
-    } else {
+    } else if (this.#description.generated_key) {
       storage_key = this.#next_id;
       this.#next_id += 1;
 
       non_persisted[this.#description.key] = storage_key;
+    } else {
+      storage_key = this.#key_as_storage_format(entry[this.#description.key]);
     }
 
     const external_key = this.#key_as_external_format(storage_key);

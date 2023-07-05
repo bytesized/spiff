@@ -1,7 +1,6 @@
-"use strict";
-
-const fs = require("fs").promises;
-const path = require("path");
+import {promises as m_fs} from "fs";
+import * as m_path from "path";
+import * as m_url from "url";
 
 const client_data_dir = "www";
 const client_index_filename = "index.html";
@@ -13,11 +12,12 @@ const content_types = {
   style: "text/css",
 };
 
-async function handle(url, path_parts, request, response) {
-  let file_path = path.join(__dirname, client_data_dir);
+export async function handle(url, path_parts, request, request_body, response) {
+  const client_dir = m_path.dirname(m_url.fileURLToPath(import.meta.url));
+  let file_path = m_path.join(client_dir, client_data_dir);
   let content_type;
   if (path_parts.length < 1) {
-    file_path = path.join(file_path, client_index_filename);
+    file_path = m_path.join(file_path, client_index_filename);
     content_type = content_types[client_index_filename];
   } else {
     const subdir = path_parts[0];
@@ -34,13 +34,13 @@ async function handle(url, path_parts, request, response) {
         response.end(`Invalid path component: "${part}"`);
         return;
       }
-      file_path = path.join(file_path, part);
+      file_path = m_path.join(file_path, part);
     }
   }
 
   let handle;
   try {
-    const handle = await fs.open(file_path, "r");
+    const handle = await m_fs.open(file_path, "r");
     const stat = await handle.stat();
     const stream = handle.createReadStream();
     response.writeHead(200, {
@@ -59,7 +59,3 @@ async function handle(url, path_parts, request, response) {
     }
   }
 }
-
-module.exports = {
-  handle
-};

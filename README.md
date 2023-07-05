@@ -19,5 +19,9 @@ This will run the server at `127.0.0.1:8080` by default, which can be changed by
 
 Argument List:
 
- - `--host` The hostname to service requests on.
- - `--port` The port number to service requests on.
+ - `--dbpath PATH` The path to the sqlite3 database to use. If non-existent, the database will be
+   created at this path. This must be specified if the environment doesn't specify a data directory
+   via the `_B_UTIL_DATA_DIR` environment variable (which is set automatically when my
+   [utilities repo](https://github.com/bytesized/utilities)).
+ - `--host HOST` The hostname to service requests on.
+ - `--port PORT` The port number to service requests on.

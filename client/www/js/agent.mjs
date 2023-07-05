@@ -1,25 +1,25 @@
 import * as m_api from "./api.mjs";
+import * as m_log from "./log.mjs";
+import * as m_server from "./server.mjs";
 import * as m_storage from "./storage.mjs";
+
+const k_log = new m_log.logger(m_log.e_log_level.warn, "agent");
 
 const k_agent_data_version = 1;
 const k_storage_description = {
   key: "id",
-  generated_key: true,
   split_public: [
     m_storage.e_store_access.existing_entries,
-    m_storage.e_store_access.remove_entries,
-    m_storage.e_store_access.clear_selection,
   ],
   entry_properties: {
-    id: {persist: true, public_access: m_storage.e_entry_access.read_only},
-    call_sign: {persist: true, public_access: m_storage.e_entry_access.read_only},
-    auth_token: {persist: true, public_access: m_storage.e_entry_access.read_only},
+    id: {public_access: m_storage.e_entry_access.read_only},
+    call_sign: {public_access: m_storage.e_entry_access.read_only},
+    auth_token: {public_access: m_storage.e_entry_access.read_only},
   },
   selection: {
     public_access: m_storage.e_entry_access.read_only,
-    persist_to_store: m_storage.k_agent_current_store_name,
     additional_properties: {
-      account_id: {persist: true, public_access: m_storage.e_entry_access.read_only},
+      account_id: {public_access: m_storage.e_entry_access.read_only},
       headquarters: {public_access: m_storage.e_entry_access.read_only},
       credits: {public_access: m_storage.e_entry_access.read_write},
       starting_faction: {public_access: m_storage.e_entry_access.read_only},
@@ -35,46 +35,71 @@ export async function init() {
   if (g_init_promise == null) {
     g_init_promise = (async () => {
       [g_storage, agents] = await m_storage.create(
-        m_storage.k_agent_store_name,
+        "agent",
         k_agent_data_version,
         k_storage_description
       );
 
+      const get_response = await m_server.agent.get_all();
+      if (!get_response.success) {
+        k_log.error("Failed to get agents from server", get_response);
+        throw new Error("Failed to get agents from server");
+      }
+
+      for (const agent of get_response.result.agents) {
+        g_storage.add(agent);
+      }
+
       // This is how we initialize the non-persisted data for the current agent.
-      await set_selected(await g_storage.get_selection_key());
+      const select_response = await set_selected(get_response.result.selected);
+      if (!select_response.success) {
+        k_log.error("Failed to set selection with server", select_response);
+        throw new Error("Failed to set selection with server");
+      }
     })();
   }
   return g_init_promise;
 }
 
 async function add_agent_internal(auth_token, agent_data) {
-  let agent = {call_sign: agent_data.symbol, auth_token};
-  await g_storage.add(agent);
-
-  const selected = await g_storage.get_selection_key();
-  if (selected == null) {
-    await set_selected_agent_internal(agent.id, agent_data);
-  }
-  return agent.id;
-}
-
-export async function register(call_sign, faction) {
-  let response = await m_api.register_agent(call_sign, faction);
+  const response = await m_server.agent.add(auth_token);
   if (!response.success) {
     return response;
   }
 
-  await add_agent_internal(response.payload.data.token, response.payload.data.agent);
+  const agent = {id: response.result.id, call_sign: agent_data.symbol, auth_token};
+  await g_storage.add(agent);
+
+  if (response.result.selected) {
+    await set_selected_agent_internal(agent.id, agent_data);
+  }
+  return response;
+}
+
+export async function register(call_sign, faction) {
+  const response = await m_api.register_agent(call_sign, faction);
+  if (!response.success) {
+    return response;
+  }
+
+  const add_response =
+    await add_agent_internal(response.payload.data.token, response.payload.data.agent);
+  if (!add_response.success) {
+    return add_response;
+  }
   return response;
 }
 
 export async function add(auth_token) {
-  let response = await m_api.get_agent_details(auth_token);
+  const response = await m_api.get_agent_details(auth_token);
   if (!response.success) {
     return response;
   }
 
-  await add_agent_internal(auth_token, response.payload.data);
+  const add_response = await add_agent_internal(auth_token, response.payload.data);
+  if (!add_response.success) {
+    return add_response;
+  }
   return response;
 }
 
@@ -83,9 +108,19 @@ export function format_call_sign(call_sign) {
 }
 
 export async function set_selected(agent_id) {
+  const deselect_response = await m_server.agent.select(null);
+  if (!deselect_response.success) {
+    return deselect_response;
+  }
+
   await g_storage.clear_selection();
   if (agent_id == null) {
-    return null;
+    return {success: true};
+  }
+
+  const select_response = await m_server.agent.select(agent_id);
+  if (!select_response.success) {
+    return select_response;
   }
 
   const agent_data = await g_storage.get(agent_id);
@@ -107,4 +142,14 @@ async function set_selected_agent_internal(agent_id, agent_data) {
     starting_faction: agent_data.startingFaction,
     account_id: agent_data.accountId,
   });
+}
+
+export async function remove(agent_id) {
+  const response = await m_server.agent.remove(agent_id);
+  if (!response.success) {
+    return response;
+  }
+
+  await g_storage.delete(agent_id);
+  return response;
 }

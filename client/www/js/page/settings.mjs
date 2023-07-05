@@ -14,10 +14,26 @@ const k_agent_empty_list_class = "agent_list_empty";
 const k_invalid_agent_name = 422;
 
 export async function init() {
+  await m_agent.init();
+
   m_text_button_box.connect_handler("add_agent_tbb", add_agent);
   m_text_button_box.connect_handler("create_agent_tbb", create_agent);
 
-  await m_agent.init();
+  m_agent.agents.add_change_listener(new m_storage.change_listener({
+    add: true,
+    callback: event => {
+      if (list_length() == 0) {
+        const list_items = [[event.entry.id, m_agent.format_call_sign(event.entry.call_sign)]];
+        const options = {delete_handler: remove_agent};
+        const list_el = m_list.create_selectable(list_items, select_agent, options);
+        replace_list(list_el);
+      } else {
+        const list_el = document.getElementById(k_agent_list_id);
+        m_list.add_item(list_el, event.entry.id, [m_agent.format_call_sign(event.entry.call_sign)],
+                        select_agent, {delete_handler: remove_agent});
+      }
+    },
+  }));
 
   m_agent.agents.add_change_listener(new m_storage.change_listener({
     properties: ["call_sign"],
@@ -25,15 +41,6 @@ export async function init() {
       const list_el = document.getElementById(k_agent_list_id);
       const item_el = m_list.get_item(list_el, event.entry.id);
       m_list.set_item_contents(item_el, m_agent.format_call_sign(event.entry.call_sign));
-    },
-  }));
-
-  m_agent.agents.add_change_listener(new m_storage.change_listener({
-    add: true,
-    callback: event => {
-      const list_el = document.getElementById(k_agent_list_id);
-      m_list.add_item(list_el, event.entry.id, [m_agent.format_call_sign(event.entry.call_sign)],
-                      select_agent, {delete_handler: remove_agent});
     },
   }));
 
@@ -135,7 +142,7 @@ async function select_agent(clicked) {
   m_list.set_busy(clicked.list);
   let agent_info_response = await m_agent.set_selected(clicked.id);
   m_list.clear_busy(clicked.list);
-  if (agent_info_response && !agent_info_response.success) {
+  if (!agent_info_response.success) {
     await m_error.show_api_failure_popup(agent_info_response);
   }
 }
@@ -152,9 +159,13 @@ async function remove_agent(clicked) {
     buttons: [m_popup.e_button.yes, m_popup.e_button.no],
     allow_non_button_close: true,
   });
-  m_list.clear_busy(clicked.list);
   if (popup_button != m_popup.e_button.yes) {
+    m_list.clear_busy(clicked.list);
     return;
   }
-  m_agent.agents.delete(clicked.id);
+  const response = await m_agent.remove(clicked.id);
+  if (!response.success) {
+    await m_error.show_api_failure_popup(response);
+  }
+  m_list.clear_busy(clicked.list);
 }
