@@ -61,7 +61,9 @@ process.stdin.on("data", async key => {
       // Closing everything we are using allows everything to shut down a bit more gracefully than
       // just forcing the process to exit.
       process.stdin.destroy();
-      server.close();
+      k_log.info("Closing server...");
+      await new Promise(resolve => server.close(resolve));
+      k_log.info("Server closed. Closing database...");
       await m_db.destroy();
       k_log.info("Everything closed.");
     } else {
