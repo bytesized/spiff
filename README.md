@@ -14,14 +14,18 @@ So I am going to run a server that interfaces with the SpaceTraders servers and 
 app interface with my server.
 
 The server can be started by running `npm run start`.
-This will run the server at `127.0.0.1:8080` by default, which can be changed by instead running
-`npm run start -- --host=localhost --port=1234`.
 
-Argument List:
+##Argument List
+Remember that the argument list should be preceded by `--`. Ex: `npm start -- --insecure`.
 
+ - `--cert PATH` The path to the certificate to use for encryption. Ignored if `--insecure` is
+   specified.
  - `--dbpath PATH` The path to the sqlite3 database to use. If non-existent, the database will be
    created at this path. This must be specified if the environment doesn't specify a data directory
    via the `_B_UTIL_DATA_DIR` environment variable (which is set automatically when my
    [utilities repo](https://github.com/bytesized/utilities)).
  - `--host HOST` The hostname to service requests on.
+ - `--insecure` Use HTTP instead of HTTPS.
+ - `--key PATH` The path to the private key to use for encryption. Ignored if `--insecure` is
+   specified.
  - `--port PORT` The port number to service requests on.
