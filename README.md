@@ -15,7 +15,7 @@ app interface with my server.
 
 The server can be started by running `npm run start`.
 
-##Argument List
+## Argument List
 Remember that the argument list should be preceded by `--`. Ex: `npm start -- --insecure`.
 
  - `--cert PATH` The path to the certificate to use for encryption. Ignored if `--insecure` is
