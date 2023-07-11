@@ -51,7 +51,11 @@ async function init() {
   k_log.debug("init - start");
   g_init_promise = new Promise(async (resolve, reject) => {
     k_log.debug("init - Waiting for permission to use persistent storage");
-    await navigator.storage.persist();
+    try {
+      await navigator.storage.persist();
+    } catch (ex) {
+      k_log.warn("init - Storage persistence failed (not https?)");
+    }
 
     k_log.info("init - Opening database");
     const request = window.indexedDB.open(k_db_name, k_db_version);

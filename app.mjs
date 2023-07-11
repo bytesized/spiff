@@ -1,4 +1,6 @@
+import {promises as m_fs} from "fs";
 import * as m_http from "http";
+import * as m_https from "https";
 import minimist from "minimist";
 
 import * as m_client from "./client/index.mjs";
@@ -10,16 +12,35 @@ const k_log = new m_log.logger(m_log.e_log_level.info, "app");
 
 const args = minimist(process.argv.slice(2));
 
-const hostname = "host" in args ? args.host : "127.0.0.1";
-const port = "port" in args ? parseInt(args.port, 10) : 8080;
+const use_https = !args.insecure;
+const server_options = {};
+
+let default_port = 8080;
+let default_host = "127.0.0.1";
+if (use_https) {
+  default_port = 443;
+  default_host = "192.168.42.1";
+  const default_key_path = "/etc/letsencrypt/live/narcoticcats.net/privkey.pem";
+  const default_cert_path = "/etc/letsencrypt/live/narcoticcats.net/fullchain.pem";
+
+  const key_path = "key" in args ? args.key : default_key_path;
+  const cert_path = "cert" in args ? args.cert : default_cert_path;
+
+  server_options.key = await m_fs.readFile(key_path);
+  server_options.cert = await m_fs.readFile(cert_path);
+}
+
+const hostname = "host" in args ? args.host : default_host;
+const port = "port" in args ? parseInt(args.port, 10) : default_port;
 
 const control_c_buffer = Buffer.from([0x03]);
 let control_c_already_pressed = false;
 
 k_log.info("Initializing...");
 await m_server.init(args);
+k_log.info("Initialization done.");
 
-const server = m_http.createServer(async (request, response) => {
+async function handle_request(request, response) {
   try {
     request.setEncoding("utf8");
     let request_body = "";
@@ -47,7 +68,14 @@ const server = m_http.createServer(async (request, response) => {
     response.writeHead(500, {"Content-Type": "text/plain"});
     response.end(`Unhandled exception`);
   }
-});
+};
+
+let server;
+if (use_https) {
+  server = m_https.createServer(server_options, handle_request);
+} else {
+  server = m_http.createServer(server_options, handle_request);
+}
 
 server.listen(port, hostname, () => {
   k_log.info(`Started server at http://${hostname}:${port}/\n`);
