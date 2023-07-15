@@ -30,6 +30,10 @@ let g_is_processing_queue = false;
 // field to store that information.
 let g_no_requests_until_after = null;
 
+// We are going to identify agents created prior to the last server reset via this error message
+// sub-string
+let k_outdated_token_message_substr = "Token reset_date does not match the server";
+
 /**
  * Dispatches an API request to the API endpoint.
  * Doesn't necessarily dispatch it immediately. The request enters a queue of requests that are
@@ -66,6 +70,9 @@ let g_no_requests_until_after = null;
  *            This will not be present if the server does not respond with valid JSON.
  *          error_type (optional)
  *            One of the values from the `m_request_shared.e_request_error` enum. This will be
+ *            present if `!success`.
+ *          known_error (optional)
+ *            One of the values from the `m_request_shared.e_known_error` enum. This will be
  *            present if `!success`.
  *          error_message (optional)
  *            A string containing a human-readable explanation of what went wrong. This will be
@@ -267,10 +274,17 @@ function process_queue() {
           }
         }
         if (!result.success) {
+          result.known_error = m_request_shared.e_known_error.none;
           if (result?.payload?.error && "message" in result.payload.error) {
             result.error_message = `Server says: ${result?.payload?.error?.message}`;
           }
           result.error_code = result?.payload?.error?.code;
+          if (result.error_code == 401) {
+            const message = result?.payload?.error?.message;
+            if (typeof message == "string" && message.includes(k_outdated_token_message_substr)) {
+              result.known_error = m_request_shared.e_known_error.outdated_token;
+            }
+          }
           if (response.status >= 400 && response.status <= 499) {
             result.error_type = m_request_shared.e_request_error.client;
           } else if (response.status >= 500 && response.status <= 599) {
@@ -278,11 +292,17 @@ function process_queue() {
           } else {
             result.error_type = m_request_shared.e_request_error.status_code;
           }
-          if (!result.error_message) {
+          if (result.known_error != m_request_shared.e_known_error.none) {
+            result.error_message = m_request_shared.k_known_error_message[result.known_error];
+          } else if (!result.error_message) {
             result.error_message =
               m_request_shared.k_request_error_default_message[result.error_type];
           }
-          k_log.warn("Request failed", response);
+          if (result.known_error != m_request_shared.e_known_error.none) {
+            k_log.warn("Request failed in known way:", result.known_error);
+          } else {
+            k_log.warn("Request failed", response);
+          }
         }
         maybe_begin_processing();
         request.callback(result);
@@ -293,6 +313,7 @@ function process_queue() {
 
         let result = {success: false};
         result.error_type = m_request_shared.e_request_error.server_exception;
+        result.known_error = m_request_shared.e_known_error.none;
         result.error_message = m_request_shared.k_request_error_default_message[result.error_type];
 
         maybe_begin_processing();

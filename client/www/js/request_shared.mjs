@@ -15,3 +15,13 @@ export const k_request_error_default_message = Object.freeze({
   [e_request_error.server]: "Server Error",
   [e_request_error.status_code]: "Unexpected status code.",
 });
+
+export const e_known_error = Object.freeze({
+  none: "e_known_error::none",
+  outdated_token: "e_known_error::outdated_token",
+});
+
+export const k_known_error_message = Object.freeze({
+  [e_known_error.none]: "No specifically known error applies to this response",
+  [e_known_error.outdated_token]: "Server has been reset since this agent was created",
+});

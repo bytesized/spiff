@@ -51,11 +51,9 @@ export async function init() {
       }
 
       // This is how we initialize the non-persisted data for the current agent.
-      const select_response = await set_selected(get_response.result.selected);
-      if (!select_response.success) {
-        k_log.error("Failed to set selection with server", select_response);
-        throw new Error("Failed to set selection with server");
-      }
+      // On failure, we just want to clear the current selection, but this function already
+      // effectively does that.
+      await set_selected(get_response.result.selected);
     })();
   }
   return g_init_promise;
@@ -108,25 +106,26 @@ export function format_call_sign(call_sign) {
 }
 
 export async function set_selected(agent_id) {
+  await g_storage.clear_selection();
+
   const deselect_response = await m_server.agent.select(null);
   if (!deselect_response.success) {
     return deselect_response;
   }
 
-  await g_storage.clear_selection();
   if (agent_id == null) {
     return {success: true};
-  }
-
-  const select_response = await m_server.agent.select(agent_id);
-  if (!select_response.success) {
-    return select_response;
   }
 
   const agent_data = await g_storage.get(agent_id);
   const response = await m_api.get_agent_details(agent_data.auth_token);
   if (!response.success) {
     return response;
+  }
+
+  const select_response = await m_server.agent.select(agent_id);
+  if (!select_response.success) {
+    return select_response;
   }
 
   await set_selected_agent_internal(agent_id, response.payload.data);
