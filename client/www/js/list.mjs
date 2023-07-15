@@ -12,8 +12,8 @@ const k_item_id_attribute = "list_id";
  * @param items
  *        An array describing the list items to be added to the created list. Each element in the
  *        array should be an array containing at least two items. The first should be a string
- *        representing the ID of the list item. The remaining can either be any combination of text
- *        string and DOM nodes that will be used as the contents of the corresponding list item
+ *        representing the ID of the list item. The remaining can be any combination of text
+ *        strings and DOM nodes that will be used as the contents of the corresponding list item
  *        element.
  * @param handler
  *        The callback function to be called when an item in the list is clicked. It will be passed
@@ -23,7 +23,7 @@ const k_item_id_attribute = "list_id";
  *          item
  *            The list item DOM element, which will be an `<li>`.
  *          id
- *            The ID from `item_map` that corresponds to the clicked list item.
+ *            The ID from `items` that corresponds to the clicked list item.
  * @param delete_handler
  *        If passed, delete icons will be placed next to each list item and, when clicked, this
  *        handler will be invoked. The argument passed to it will be the same as the argument that
