@@ -1,5 +1,5 @@
 import * as m_log from "./log.mjs";
-import * as m_request_shared from "../client/www/js/request_shared.mjs";
+import * as m_request_shared from "../client/www/js/shared/request.mjs";
 
 const k_log = new m_log.logger(m_log.e_log_level.warn, "server/api_request");
 
