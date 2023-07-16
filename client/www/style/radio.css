@@ -1,0 +1,58 @@
+.radio_container {
+  display: flex;
+  flex-direction: column;
+}
+
+.radio_container.horizontal {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.radio_container .radio_item {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.radio_container .radio_item  input {
+  flex-grow: 0;
+  flex-shrink: 0;
+  appearance: none;
+  background-color: var(--el_background_color);
+  border: none;
+  color: white;
+  margin: 0.2rem;
+  margin-right: 0.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.radio_container .radio_item  input:hover {
+  background-color: var(--subtle_accent_color);
+}
+
+.radio_container .radio_item  input:checked {
+  background-color: var(--accent_color);
+}
+
+.radio_container .radio_item  input:checked::before {
+  content: "✓";
+  font-size: 1.1rem;
+}
+
+.radio_container .radio_item  label {
+  flex-grow: 1;
+  flex-shrink: 1;
+  line-height: 1.5rem;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.radio_container.horizontal .radio_item:not(:last-child) label {
+  margin-right: 2rem;
+}
