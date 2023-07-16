@@ -1,7 +1,9 @@
 import * as m_agent from "../agent.mjs";
+import * as m_agent_shared from "../shared/agent.mjs";
 import * as m_error from "../error.mjs";
 import * as m_list from "../list.mjs";
 import * as m_popup from "../popup.mjs";
+import * as m_radio from "../radio.mjs";
 import * as m_storage from "../storage.mjs";
 import * as m_text_button_box from "../text_button_box.mjs";
 
@@ -11,7 +13,13 @@ const k_create_agent_faction_input_id = "create_agent_faction";
 const k_agent_list_empty_string = "No Agents Found";
 const k_agent_empty_list_class = "agent_list_empty";
 
-const k_invalid_agent_name = 422;
+const k_invalid_agent_name_error_code = 422;
+
+const k_server_reset_behavior = Object.freeze({
+  [m_agent_shared.e_server_reset_behavior.ignore]: "Do Nothing",
+  [m_agent_shared.e_server_reset_behavior.remove]: "Remove Agents",
+  [m_agent_shared.e_server_reset_behavior.recreate]: "Attempt to Re-Create Agents",
+});
 
 export async function init() {
   await m_agent.init();
@@ -86,6 +94,14 @@ export async function init() {
     list_el = m_list.create_selectable(list_items, select_agent, options);
   }
   replace_list(list_el);
+
+  const radio_items = [];
+  for (const id in k_server_reset_behavior) {
+    radio_items.push([id, k_server_reset_behavior[id]]);
+  }
+  const radio = m_radio.create(radio_items, server_reset_behavior_change, {horizontal: true});
+  const loading_el = document.getElementById("server_reset_loading");
+  loading_el.parentNode.replaceChild(radio, loading_el);
 }
 
 function list_length() {
@@ -123,7 +139,7 @@ async function create_agent(box) {
   let faction = document.getElementById(k_create_agent_faction_input_id).value;
   let response = await m_agent.register(call_sign, faction);
   if (!response.success) {
-    if (response.payload?.error?.code == k_invalid_agent_name) {
+    if (response.payload?.error?.code == k_invalid_agent_name_error_code) {
       return m_popup.show({
         title: "Error: Invalid Agent Name",
         message: response.payload.error.data.symbol[0],
@@ -168,4 +184,9 @@ async function remove_agent(clicked) {
     await m_error.show_api_failure_popup(response);
   }
   m_list.clear_busy(clicked.list);
+}
+
+async function server_reset_behavior_change(clicked) {
+  // TODO: Implement
+  console.log(`Server Reset Behavior Change: ${clicked.id}`);
 }

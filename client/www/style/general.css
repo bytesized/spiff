@@ -50,3 +50,9 @@ button {
 pre.inline_output {
   display: inline;
 }
+
+fieldset {
+  border-radius: var(--border_radius);
+  border-width: var(--border_width);
+  border-color: var(--border_color);
+}

@@ -14,6 +14,7 @@
   <link rel="stylesheet" href="/client/style/list.css" />
   <link rel="stylesheet" href="/client/style/page.css" />
   <link rel="stylesheet" href="/client/style/page/agent.css" />
+  <link rel="stylesheet" href="/client/style/page/settings.css" />
   <link rel="stylesheet" href="/client/style/popup.css" />
   <link rel="stylesheet" href="/client/style/progress.css" />
   <link rel="stylesheet" href="/client/style/radio.css" />
@@ -60,6 +61,11 @@
       <div id="settings_page" class="page active_page">
         <h1>Select an Agent</h1>
         <div id="agent_list" class="busy_spinner medium_size"></div>
+        <br />
+        <fieldset id="agent_server_reset_fieldset">
+          <legend>Server Reset Behavior</legend>
+          <div id="server_reset_loading" class="busy_spinner medium_size"></div>
+        </fieldset>
         <h2>Add New Agent</h2>
         <div id="add_agent_tbb" class="text_button_box">
           <input type="text" placeholder="Token" />
