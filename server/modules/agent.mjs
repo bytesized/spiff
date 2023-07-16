@@ -218,7 +218,7 @@ async function fire_change_agent_selection_listeners(id,
                                                } = {}) {
   if (id != null && (call_sign == undefined || auth_token == undefined)) {
     await m_db.enqueue(async db => {
-      const result = await db.get("SELECT call_sign, auth_token FROM agents WHERE id = $id", {
+      const result = await db.get("SELECT call_sign, auth_token FROM agents WHERE id = $id;", {
         $id: id,
       });
       call_sign = result.call_sign;
@@ -364,7 +364,7 @@ async function remove_agent(id, {already_within_transaction = false} = {}) {
   const response = {};
 
   await m_db.enqueue(async db => {
-    const result = await db.run("DELETE FROM tagged_agents WHERE tag = $tag AND id = $id", {
+    const result = await db.run("DELETE FROM tagged_agents WHERE tag = $tag AND id = $id;", {
       $tag: k_agent_tag_id[e_agent_tag.selected_agent],
       $id: id,
     });
