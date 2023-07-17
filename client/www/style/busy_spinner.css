@@ -58,7 +58,7 @@ fieldset .sub_spinner_overlay {
   margin-left: calc(-1 * var(--fieldset_horizontal_padding));
   margin-right: calc(-1 * var(--fieldset_horizontal_padding));
   border-radius: var(--border_radius);
-  padding: 0.2rem;
+  padding: 0.6rem;
 }
 
 /*
