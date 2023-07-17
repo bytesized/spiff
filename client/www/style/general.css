@@ -77,4 +77,7 @@ fieldset {
  */
 fieldset > legend {
   height: var(--fieldset_legend_height);
+  /* Position the legend over the busy spinner overlay */
+  position: relative;
+  z-index: 1;
 }
