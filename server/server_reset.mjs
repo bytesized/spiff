@@ -2,7 +2,7 @@ import * as m_api from "./api.mjs";
 import * as m_db from "./db.mjs";
 import * as m_log from "./log.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.warn, "server_reset");
+const k_log = new m_log.logger(m_log.e_log_level.info, "server_reset");
 
 const k_server_reset_db_current_version = 1;
 
@@ -63,6 +63,7 @@ export async function init(args) {
         $id: g_current_server_reset_id,
       });
       if (result.last_reset != metadata_response.payload.resetDate) {
+        k_log.info("Server reset since last run");
         result = await db.run(
           `INSERT INTO server_reset(id,  last_reset,  next_reset)
                             VALUES ($id, $last_reset, $next_reset);`,
