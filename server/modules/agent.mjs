@@ -162,8 +162,12 @@ export async function init(args) {
             id INTEGER PRIMARY KEY ASC,
             server_reset_id NOT NULL REFERENCES server_reset(id),
             call_sign TEXT NOT NULL,
-            auth_token TEXT NOT NULL
+            auth_token TEXT NOT NULL,
+            removed INTEGER NOT NULL DEFAULT 0
           );
+        `);
+        await db.run(`
+          CREATE INDEX index_agents_removed ON agents(removed);
         `);
         await db.run(`
           CREATE TABLE tagged_agents(
@@ -256,9 +260,9 @@ export async function handle(url, path_parts, request, request_body, response) {
  * Added listeners will be called when the agent selection changes. Arguments passed to the
  * listener will be:
  *    agent
- *      Either `null` if no agent is now selected, or an object with the following properties:
+ *      An object with the following properties:
  *        id
- *          Integer id representing the agent
+ *          Integer id representing the agent, or `null` if no agent is now selected.
  *        call_sign
  *          The agent's call sign. Property won't be present if `id` is `null`.
  *        auth_token
@@ -353,7 +357,9 @@ async function get_agents({already_within_transaction = false} = {}) {
   const response = {result:{}};
 
   await m_db.enqueue(async db => {
-    const agents = await db.all("SELECT id, call_sign, auth_token FROM agents;");
+    const agents = await db.all(
+      "SELECT id, call_sign, auth_token FROM agents WHERE removed = 0 ORDER BY id ASC;"
+    );
     response.result.agents = [];
     for (const {id, call_sign, auth_token} of agents) {
       response.result.agents.push({id: id.toString(), call_sign, auth_token});
@@ -391,7 +397,7 @@ export async function get_selected_agent_id({already_within_transaction = false}
  *        Integer id.
  */
 async function select_agent(id, {already_within_transaction = false} = {}) {
-  const response = {};
+  const response = {success: true};
 
   await m_db.enqueue(async db => {
     if (id == null) {
@@ -408,6 +414,13 @@ async function select_agent(id, {already_within_transaction = false} = {}) {
         return;
       }
 
+      const result = await db.get("SELECT removed FROM agents WHERE id = $id;", {$id: id});
+      if (result == undefined || result.removed != 0) {
+        response.success = false;
+        response.error_message = `No agent with id "${id}"`;
+        return;
+      }
+
       await db.run("INSERT OR REPLACE INTO tagged_agents (tag, id) VALUES ($tag, $id);", {
         $tag: k_agent_tag_id[e_agent_tag.selected_agent],
         $id: id,
@@ -416,7 +429,6 @@ async function select_agent(id, {already_within_transaction = false} = {}) {
     }
   }, {with_transaction: true, already_within_transaction});
 
-  response.success = true;
   return response;
 }
 
@@ -434,7 +446,7 @@ async function remove_agent(id, {already_within_transaction = false} = {}) {
     });
     const agent_was_selected = result.changes > 0;
 
-    await db.run("DELETE FROM agents WHERE id = $id;", {
+    await db.run("UPDATE agents SET removed = 1 WHERE id = $id;", {
       $id: id,
     });
 
