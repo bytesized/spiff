@@ -11,14 +11,13 @@
  *        Boolean indicating whether or not the request succeeded.
  *      result
  *        Present if `success == true`. Will be an object containing these keys:
- *
- *        id
- *          A string identifier assigned to the user when added to the database. Used to identify
- *          the user on subsequent requests.
- *        selected
- *          Boolean indicating whether or not the added agent is now the selected agent.
+ *          id
+ *            A string identifier assigned to the user when added to the database. Used to identify
+ *            the user on subsequent requests.
+ *          selected
+ *            Boolean indicating whether or not the added agent is now the selected agent.
  *      error_message
- *        A string error message indicating why the request failed.
+ *        Present if `success == false`. A string error message indicating why the request failed.
  *      st_response
  *        Present if a request was made to the SpaceTraders server. Will contain the response. Will
  *        always be present if `success == true`.
@@ -36,7 +35,6 @@
  *
  *        agents
  *          An array of objects, each of which will contain these keys:
- *
  *            id
  *              A string identifier associated with the agent.
  *            call_sign
@@ -47,7 +45,7 @@
  *        selected
  *          Either the id of the agent that is selected or `null` if no agent is selected.
  *      error_message
- *        A string error message indicating why the request failed.
+ *        Present if `success == false`. A string error message indicating why the request failed.
  *
  *  server/agent/select
  *    Sets the specified agent as the selected agent.
@@ -60,7 +58,7 @@
  *      success
  *        Boolean indicating whether or not the request succeeded.
  *      error_message
- *        A string error message indicating why the request failed.
+ *        Present if `success == false`. A string error message indicating why the request failed.
  *
  *  server/agent/remove
  *    Removes the specified agent.
@@ -72,11 +70,42 @@
  *      success
  *        Boolean indicating whether or not the request succeeded.
  *      error_message
- *        A string error message indicating why the request failed.
+ *        Present if `success == false`. A string error message indicating why the request failed.
+ *
+ *  server/agent/get_server_reset_behavior
+ *    Retrieves the configuration determining what will be done with (now invalid) agent data when
+ *    the server is reset.
+ *
+ *    Parameters:
+ *      None
+ *    Return Format:
+ *      success
+ *        Boolean indicating whether or not the request succeeded.
+ *      result
+ *        Present if `success == true`. Will be an object containing these keys:
+ *          server_reset_behavior
+ *            A value from `m_agent_shared.e_server_reset_behavior`.
+ *      error_message
+ *        Present if `success == false`. A string error message indicating why the request failed.
+ *
+ *  server/agent/set_server_reset_behavior
+ *    Retrieves the configuration determining what will be done with (now invalid) agent data when
+ *    the server is reset.
+ *
+ *    Parameters:
+ *      server_reset_behavior
+ *        A value from `m_agent_shared.e_server_reset_behavior`.
+ *    Return Format:
+ *      success
+ *        Boolean indicating whether or not the request succeeded.
+ *      error_message
+ *        Present if `success == false`. A string error message indicating why the request failed.
  */
+import * as m_agent_shared from "../../client/www/js/shared/agent.mjs";
 import * as m_api from "../api.mjs";
 import * as m_db from "../db.mjs";
 import * as m_log from "../log.mjs";
+import * as m_server_reset from "../server_reset.mjs";
 import * as m_utils from "../utils.mjs";
 
 const k_log = new m_log.logger(m_log.e_log_level.warn, "server/agent");
@@ -85,15 +114,29 @@ const k_add_agent_command = "add";
 const k_get_all_command = "get_all";
 const k_select_command = "select";
 const k_remove_command = "remove";
+const k_get_server_reset_behavior_command = "get_server_reset_behavior";
+const k_set_server_reset_behavior_command = "set_server_reset_behavior";
 
 const k_agent_db_current_version = 1;
 
-const e_agent_tag = {
+const e_agent_tag = Object.freeze({
   selected_agent: "e_agent_tag::selected_agent",
-};
-const k_agent_tag_id = {
+});
+const k_agent_tag_id = Object.freeze({
   [e_agent_tag.selected_agent]: 1,
-};
+});
+
+// Maps between enumerated server reset behaviors and integers for conversion to and from the
+// `meta_int` table.
+const k_int_to_server_reset_behavior = Object.freeze([
+  m_agent_shared.e_server_reset_behavior.ignore,
+  m_agent_shared.e_server_reset_behavior.remove,
+  m_agent_shared.e_server_reset_behavior.recreate,
+]);
+const k_server_reset_behavior_to_int = Object.freeze(
+  Object.fromEntries(k_int_to_server_reset_behavior.map((b, i) => [b, i]))
+);
+const k_default_server_reset_behavior = m_agent_shared.e_server_reset_behavior.ignore;
 
 let g_agent_selection_listeners = [];
 
@@ -117,6 +160,7 @@ export async function init(args) {
         await db.run(`
           CREATE TABLE agents(
             id INTEGER PRIMARY KEY ASC,
+            server_reset_id NOT NULL REFERENCES server_reset(id),
             call_sign TEXT NOT NULL,
             auth_token TEXT NOT NULL
           );
@@ -131,6 +175,16 @@ export async function init(args) {
 
       await m_db.set_meta_int(m_db.e_meta_int.agent_module_version, k_agent_db_current_version,
                               {already_within_transaction: true});
+
+      const server_reset_behavior = await m_db.get_meta_int(
+        m_db.e_meta_int.agent_server_reset_behavior,
+        {already_within_transaction: true}
+      );
+      if (server_reset_behavior == null) {
+        await m_db.set_meta_int(m_db.e_meta_int.agent_server_reset_behavior,
+                                k_server_reset_behavior_to_int[k_default_server_reset_behavior],
+                                {already_within_transaction: true});
+      }
     }
   }, {with_transaction: true});
 }
@@ -185,6 +239,14 @@ export async function handle(url, path_parts, request, request_body, response) {
     const response_object = await remove_agent(id);
     m_utils.respond_success(k_log, response, response_object);
     return;
+  } else if (command == k_get_server_reset_behavior_command) {
+    const response_object = await get_server_reset_behavior();
+    m_utils.respond_success(k_log, response, response_object);
+    return;
+  } else if (command == k_set_server_reset_behavior_command) {
+    const response_object = await set_server_reset_behavior(request_body.server_reset_behavior);
+    m_utils.respond_success(k_log, response, response_object);
+    return;
   }
 
   m_utils.respond_error(k_log, response, 404, `Agent has no such command "${command}"`);
@@ -211,11 +273,11 @@ export function add_change_agent_selection_listener(fn) {
 }
 
 async function fire_change_agent_selection_listeners(id,
-                                               {
-                                                call_sign,
-                                                auth_token,
-                                                already_within_transaction = false,
-                                               } = {}) {
+                                                     {
+                                                      call_sign,
+                                                      auth_token,
+                                                      already_within_transaction = false,
+                                                     } = {}) {
   if (id != null && (call_sign == undefined || auth_token == undefined)) {
     await m_db.enqueue(async db => {
       const result = await db.get("SELECT call_sign, auth_token FROM agents WHERE id = $id;", {
@@ -258,8 +320,10 @@ async function add_agent(auth_token, {already_within_transaction = false} = {}) 
 
   await m_db.enqueue(async db => {
     let result = await db.run(
-      "INSERT INTO agents (call_sign, auth_token) VALUES ($call_sign, $auth_token);",
+      `INSERT INTO agents (server_reset_id,  call_sign,  auth_token)
+                   VALUES ($server_reset_id, $call_sign, $auth_token);`,
       {
+        $server_reset_id: m_server_reset.current_server_reset_id(),
         $call_sign: call_sign,
         $auth_token: auth_token,
       }
@@ -381,4 +445,26 @@ async function remove_agent(id, {already_within_transaction = false} = {}) {
 
   response.success = true;
   return response;
+}
+
+async function get_server_reset_behavior({already_within_transaction = false} = {}) {
+  const server_reset_behavior_int = await m_db.get_meta_int(
+    m_db.e_meta_int.agent_server_reset_behavior,
+    {already_within_transaction}
+  );
+  const server_reset_behavior = k_int_to_server_reset_behavior[server_reset_behavior_int];
+
+  return {success: true, result: {server_reset_behavior}};
+}
+
+/**
+ * @param server_reset_behavior
+ *        A value from `m_agent_shared.e_server_reset_behavior`.
+ */
+async function set_server_reset_behavior(server_reset_behavior,
+                                         {already_within_transaction = false} = {}) {
+  const server_reset_behavior_int = k_server_reset_behavior_to_int[server_reset_behavior];
+  await m_db.set_meta_int(m_db.e_meta_int.agent_server_reset_behavior, server_reset_behavior_int,
+                          {already_within_transaction});
+  return {success: true};
 }

@@ -17,13 +17,17 @@ const k_meta_int_module_current_version = 1;
 
 export const e_meta_int = {
   meta_int_module_version: "e_meta_int::meta_int_module_version",
+  server_reset_version: "e_meta_int::server_reset_version",
   agent_module_version: "e_meta_int::agent_module_version",
+  agent_server_reset_behavior: "e_meta_int::agent_server_reset_behavior",
 };
 
 // These must be unique integers
 const k_meta_int_key = {
   [e_meta_int.meta_int_module_version]: 1,
-  [e_meta_int.agent_module_version]: 2,
+  [e_meta_int.server_reset_version]: 2,
+  [e_meta_int.agent_module_version]: 3,
+  [e_meta_int.agent_server_reset_behavior]: 4,
 };
 
 export async function init(args) {

@@ -1,5 +1,6 @@
 import * as m_db from "./db.mjs";
 import * as m_log from "./log.mjs";
+import * as m_server_reset from "./server_reset.mjs";
 
 const k_log = new m_log.logger(m_log.e_log_level.warn, "server");
 
@@ -10,7 +11,10 @@ const modules = {
 
 export async function init(args) {
   await m_db.init(args);
+  // Requires: m_db
+  await m_server_reset.init(args);
 
+  // Do module initialization last. They often depend on other things and nothing depends on them.
   for (const module_name in modules) {
     if ("init" in modules[module_name]) {
       await modules[module_name].init(args);

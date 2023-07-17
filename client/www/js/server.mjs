@@ -77,4 +77,12 @@ export const agent = Object.freeze({
   async remove(id) {
     return dispatch("agent/remove", {id});
   },
+
+  async get_server_reset_behavior() {
+    return dispatch("agent/get_server_reset_behavior");
+  },
+
+  async set_server_reset_behavior(server_reset_behavior) {
+    return dispatch("agent/set_server_reset_behavior", {server_reset_behavior});
+  },
 });

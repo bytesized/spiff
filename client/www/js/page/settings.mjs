@@ -4,6 +4,7 @@ import * as m_error from "../error.mjs";
 import * as m_list from "../list.mjs";
 import * as m_popup from "../popup.mjs";
 import * as m_radio from "../radio.mjs";
+import * as m_server from "../server.mjs";
 import * as m_storage from "../storage.mjs";
 import * as m_text_button_box from "../text_button_box.mjs";
 
@@ -95,11 +96,19 @@ export async function init() {
   }
   replace_list(list_el);
 
+  const response = await m_server.agent.get_server_reset_behavior();
+  if (!response.success) {
+    throw new Error(`Failed to get agent server reset behavior: ${response.error_message}`);
+  }
   const radio_items = [];
   for (const id in k_server_reset_behavior) {
     radio_items.push([id, k_server_reset_behavior[id]]);
   }
-  const radio = m_radio.create(radio_items, server_reset_behavior_change, {horizontal: true});
+  const radio = m_radio.create(
+    radio_items,
+    server_reset_behavior_change,
+    {horizontal: true, selected_id: response.result.server_reset_behavior}
+  );
   const loading_el = document.getElementById("server_reset_loading");
   loading_el.parentNode.replaceChild(radio, loading_el);
 }
@@ -187,6 +196,16 @@ async function remove_agent(clicked) {
 }
 
 async function server_reset_behavior_change(clicked) {
-  // TODO: Implement
-  console.log(`Server Reset Behavior Change: ${clicked.id}`);
+  if (m_radio.is_busy(clicked.radio_container)) {
+    // This must have been the selection being changed back as the result of a server failure.
+    // Just exit early.
+    return;
+  }
+  m_radio.set_busy(clicked.radio_container);
+  const response = await m_server.agent.set_server_reset_behavior(clicked.id);
+  if (!response.success) {
+    await m_error.show_server_failure_popup(response);
+    m_radio.select(clicked.radio_container, clicked.prev_id);
+  }
+  m_radio.clear_busy(clicked.radio_container);
 }
