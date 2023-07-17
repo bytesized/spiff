@@ -7,6 +7,10 @@ const k_radio_item_container_class = "radio_item";
 const k_radio_group_name_prefix = "radio_group_";
 const k_radio_input_id_prefix = "radio_input_";
 
+const k_radio_input_id_attribute = "radio_id";
+
+const k_currently_selected = {};
+
 let g_next_radio_group_id = 0;
 let g_next_radio_input_id = 0;
 
@@ -23,6 +27,8 @@ let g_next_radio_input_id = 0;
  *            The DOM element that was returned by `create`.
  *          id
  *            The ID from `items` that corresponds to the clicked list item.
+ *          prev_id
+ *            The ID that was selected previously or `null` if nothing was previously selected.
  * @param horizontal
  *        If `true`, the radio buttons will be laid out horizontally rather than vertically.
  * @param selected_id
@@ -50,6 +56,7 @@ export function create(items, handler, {horizontal, selected_id} = {}) {
     g_next_radio_input_id += 1;
     input.setAttribute("type", "radio");
     input.setAttribute("name", group_name);
+    input.setAttribute(k_radio_input_id_attribute, item_id);
     input.checked = item_id == selected_id;
     item_container.append(input);
 
@@ -57,7 +64,13 @@ export function create(items, handler, {horizontal, selected_id} = {}) {
     input.addEventListener("change", async event => {
       event = event || window.event;
       event.stopPropagation();
-      await handler(handler_arg);
+
+      const handler_arg_instance = {};
+      Object.assign(handler_arg_instance, handler_arg);
+      handler_arg_instance.prev_id = k_currently_selected[group_name];
+      k_currently_selected[group_name] = item_id;
+
+      await handler(handler_arg_instance);
     });
 
     const label = document.createElement("label");
@@ -65,6 +78,9 @@ export function create(items, handler, {horizontal, selected_id} = {}) {
     label.htmlFor = input.id;
     item_container.append(label);
   }
+
+  k_currently_selected[group_name] = selected_id ?? null;
+
   return container;
 }
 
@@ -87,4 +103,9 @@ export function clear_busy(radio_container) {
   }
 
   m_busy_spinner.remove_overlay(radio_container);
+}
+
+export function select(radio_container, id) {
+  const input = radio_container.querySelector(`input[${k_radio_input_id_attribute}='${id}']`);
+  input.click();
 }
