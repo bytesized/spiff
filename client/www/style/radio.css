@@ -1,6 +1,7 @@
 .radio_container {
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .radio_container.horizontal {
@@ -26,6 +27,7 @@
   width: 1.5rem;
   height: 1.5rem;
   border-radius: 50%;
+  cursor: pointer;
 
   display: flex;
   align-items: center;
@@ -53,6 +55,6 @@
   cursor: pointer;
 }
 
-.radio_container.horizontal .radio_item:not(:last-child) label {
-  margin-right: 2rem;
+.radio_container.horizontal .radio_item:not(:first-child) {
+  margin-left: 2rem;
 }

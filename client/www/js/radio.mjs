@@ -67,3 +67,24 @@ export function create(items, handler, {horizontal, selected_id} = {}) {
   }
   return container;
 }
+
+export function is_busy(radio_container) {
+  return m_busy_spinner.has_busy_spinner(radio_container);
+}
+
+export function set_busy(radio_container) {
+  if (is_busy(radio_container)) {
+    throw new Error("Attempted to set already busy radio container to busy");
+  }
+
+  let s = m_busy_spinner.create({with_overlay: true});
+  radio_container.append(s);
+}
+
+export function clear_busy(radio_container) {
+  if (!is_busy(radio_container)) {
+    throw new Error("Attempted to clear busy status of non-busy radio container");
+  }
+
+  m_busy_spinner.remove_overlay(radio_container);
+}

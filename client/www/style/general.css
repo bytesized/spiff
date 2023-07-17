@@ -55,4 +55,26 @@ fieldset {
   border-radius: var(--border_radius);
   border-width: var(--border_width);
   border-color: var(--border_color);
+
+  --fieldset_horizontal_padding: 1rem;
+  --fieldset_top_padding: 1rem;
+  --fieldset_bottom_padding: 1rem;
+  padding-top: var(--fieldset_top_padding);
+  padding-bottom: var(--fieldset_bottom_padding);
+  padding-right: var(--fieldset_horizontal_padding);
+  padding-left: var(--fieldset_horizontal_padding);
+
+  --fieldset_border_width: 0.1rem;
+  border-width: var(--fieldset_border_width);
+
+  --fieldset_legend_height: 1rem;
+}
+
+/**
+ * This is pretty hacky. We need to know the height of the legend in order to compute the spinner
+ * overlay offset that we want for a busy spinner in a fieldset. But I don't think we can just know
+ * it in CSS, so we'll just set it instead.
+ */
+fieldset > legend {
+  height: var(--fieldset_legend_height);
 }
