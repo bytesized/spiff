@@ -301,7 +301,7 @@ function process_queue() {
           if (result.known_error != m_request_shared.e_known_error.none) {
             k_log.warn("Request failed in known way:", result.known_error);
           } else {
-            k_log.warn("Request failed", response);
+            k_log.warn("Request failed", response, result.error_message);
           }
         }
         maybe_begin_processing();
