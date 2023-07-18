@@ -9,10 +9,33 @@ const k_server_reset_db_current_version = 1;
 const k_first_server_reset_id = 1;
 let g_current_server_reset_id;
 
+const k_early_listen_start_minutes = 10;
+const k_reset_poll_interval_seconds = 30;
+// These times will all be in milliseconds since the epoch.
+let g_next_scheduled_reset_time;
+let g_last_reset_time;
+let g_next_poll_time;
+// We actually don't support launching while the SpaceTraders server is resetting. So either this
+// is true or we will throw an error during initialization.
+let g_server_reset_in_progress = false;
+let g_server_reset_poll_timer;
+
+let g_start_listeners = [];
+let g_complete_listeners = [];
+
 export async function init(args) {
   const metadata_response = await m_api.get_metadata();
   if (!metadata_response.success) {
     throw new Error(`Failed to get server metadata: ${metadata_response.error_message}`);
+  }
+  const next_reset_string = metadata_response.payload.serverResets?.next;
+  if (typeof next_reset_string != "string") {
+    throw new Error(`Expected string next reset time. Got ${JSON.stringify(next_reset_string)}`);
+  }
+  g_next_scheduled_reset_time = new Date(next_reset_string).getTime();
+  g_last_reset_time = metadata_response.payload.resetDate;
+  if (typeof g_last_reset_time != "string") {
+    throw new Error(`Expected string last reset time. Got ${JSON.stringify(next_reset_string)}`);
   }
 
   await m_db.enqueue(async db => {
@@ -52,8 +75,8 @@ export async function init(args) {
                           VALUES ($id, $last_reset, $next_reset);`,
         {
           $id: k_first_server_reset_id,
-          $last_reset: metadata_response.payload.resetDate,
-          $next_reset: metadata_response.payload.serverResets?.next ?? null,
+          $last_reset: g_last_reset_time,
+          $next_reset: next_reset_string,
         }
       );
       g_current_server_reset_id = result.lastID;
@@ -62,23 +85,173 @@ export async function init(args) {
       result = await db.get("SELECT last_reset FROM server_reset WHERE id = $id;", {
         $id: g_current_server_reset_id,
       });
-      if (result.last_reset != metadata_response.payload.resetDate) {
-        k_log.info("Server reset since last run");
+      if (result.last_reset != g_last_reset_time) {
+        const new_id = g_current_server_reset_id + 1;
+        k_log.info("Server reset since last run", g_current_server_reset_id, "->", new_id);
         result = await db.run(
           `INSERT INTO server_reset(id,  last_reset,  next_reset)
                             VALUES ($id, $last_reset, $next_reset);`,
           {
-            $id: g_current_server_reset_id + 1,
-            $last_reset: metadata_response.payload.resetDate,
-            $next_reset: metadata_response.payload.serverResets?.next ?? null,
+            $id: new_id,
+            $last_reset: g_last_reset_time,
+            $next_reset: next_reset_string,
           }
         );
         g_current_server_reset_id = result.lastID;
       }
     }
   }, {with_transaction: true});
+
+  start_reset_polling_timer();
+}
+
+export async function shutdown() {
+  if (g_server_reset_poll_timer) {
+    clearTimeout(g_server_reset_poll_timer);
+  }
 }
 
 export function current_server_reset_id() {
   return g_current_server_reset_id;
+}
+
+/**
+ * When a server reset starts, listeners passed to this function will be fired.
+ * These listeners are not guaranteed to fire, but should if the reset happens close to the
+ * advertised time. And takes longer than the polling interval.
+ * Listeners will be passed no arguments.
+ */
+export function add_begin_reset_listener(fn) {
+  g_start_listeners.push(fn);
+}
+
+/**
+ * When a server reset completes, listeners passed to this function will be fired.
+ * These listeners are guaranteed to be fired any time the server reset id changes, except on
+ * server launch.
+ * Listeners will be passed a single argument that will be an object with the following properties:
+ *  previous_server_reset_id
+ *    The server reset id from before the server reset.
+ *  server_reset_id
+ *    The new server reset id.
+ */
+export function add_reset_complete_listener(fn) {
+  g_complete_listeners.push(fn);
+}
+
+function human_readable_duration(duration_ms) {
+  let sign = "";
+  if (duration_ms < 0) {
+    sign = "-";
+    duration_ms *= -1;
+  }
+
+  const milliseconds = duration_ms % 1000;
+
+  const duration_seconds = (duration_ms - milliseconds) / 1000;
+  const seconds = duration_seconds % 60;
+
+  const duration_minutes = (duration_seconds - seconds) / 60;
+  const minutes = duration_minutes % 60;
+
+  const duration_hours = (duration_minutes - minutes) / 60;
+  const hours = duration_hours % 24;
+
+  const days = (duration_hours - hours) / 24;
+
+  return (
+    sign +
+    days.toString() + "d" +
+    hours.toString() + "h" +
+    minutes.toString() + "m" +
+    seconds.toString() + "." + milliseconds.toString().padStart(3, "0") + "s"
+  );
+}
+
+/**
+ * Expects `g_next_scheduled_reset_time` to be set properly. Sets `g_next_poll_time` and starts a
+ * timer that calls `on_reset_timer_expired`.
+ */
+function start_reset_polling_timer() {
+  const now = new Date().getTime();
+  g_next_poll_time = g_next_scheduled_reset_time - (k_early_listen_start_minutes * 60 * 1000);
+  const delay = Math.max(0, g_next_poll_time - now);
+  k_log.debug("Time until server reset polling starts:", () => human_readable_duration(delay));
+  g_server_reset_poll_timer = setTimeout(on_reset_timer_expired, delay);
+}
+
+async function on_reset_timer_expired({already_within_transaction = false} = {}) {
+  g_server_reset_poll_timer = null;
+
+  const now = new Date().getTime();
+  if (now < g_next_poll_time) {
+    k_log.debug("Timer fired early by", () => human_readable_duration(g_next_poll_time - now));
+    start_reset_polling_timer();
+    return;
+  }
+  g_next_poll_time += k_reset_poll_interval_seconds * 1000;
+
+  const metadata_response = await m_api.get_metadata();
+  if (!metadata_response.success) {
+    // This probably means that the server reset is in-progress
+    if (!g_server_reset_in_progress) {
+      g_server_reset_in_progress = true;
+
+      for (const listener of g_start_listeners) {
+        try {
+          await listener();
+        } catch (ex) {
+          k_log.error(ex);
+        }
+      }
+    }
+  } else {
+    const last_reset = metadata_response.payload.resetDate;
+    if (typeof last_reset != "string") {
+      throw new Error(`Expected string last reset time. Got ${JSON.stringify(next_reset_string)}`);
+    }
+    const next_reset_string = metadata_response.payload.serverResets?.next;
+    if (typeof next_reset_string != "string") {
+      throw new Error(`Expected string next reset time. Got ${JSON.stringify(next_reset_string)}`);
+    }
+    g_next_scheduled_reset_time = new Date(next_reset_string).getTime();
+    if (last_reset == g_last_reset_time) {
+      const new_polling_start =
+        g_next_scheduled_reset_time - (k_early_listen_start_minutes * 60 * 1000);
+      if (new_polling_start > g_next_poll_time) {
+        k_log.info("Reset time postponed until", () => new Date(new_polling_start));
+        g_next_poll_time = new_polling_start;
+      }
+    } else {
+      g_last_reset_time = last_reset;
+      const old_server_reset_id = g_current_server_reset_id;
+      g_current_server_reset_id += 1;
+      k_log.info("Server reset detected", old_server_reset_id, "->", g_current_server_reset_id);
+
+      await m_db.enqueue(async db => {
+        await db.run(
+          `INSERT INTO server_reset(id,  last_reset,  next_reset)
+                            VALUES ($id, $last_reset, $next_reset);`,
+          {
+            $id: g_current_server_reset_id,
+            $last_reset: g_last_reset_time,
+            $next_reset: next_reset_string,
+          }
+        );
+      }, {already_within_transaction});
+
+      const arg = Object.freeze({
+        previous_server_reset_id: old_server_reset_id,
+        server_reset_id: g_current_server_reset_id,
+      });
+      for (const listener of g_complete_listeners) {
+        listener(arg);
+      }
+      return start_reset_polling_timer();
+    }
+  }
+
+  const delay = Math.max(0, g_next_poll_time - now);
+  k_log.debug("Waiting for server reset. Next poll in", () => human_readable_duration(delay));
+  g_server_reset_poll_timer = setTimeout(on_reset_timer_expired, delay);
 }

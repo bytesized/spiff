@@ -22,6 +22,17 @@ export async function init(args) {
   }
 }
 
+export async function shutdown() {
+  for (const module_name in modules) {
+    if ("shutdown" in modules[module_name]) {
+      await modules[module_name].init(args);
+    }
+  }
+
+  await m_server_reset.shutdown();
+  await m_db.shutdown();
+}
+
 export async function handle(url, path_parts, request, request_body, response) {
   if (path_parts.length < 1) {
     const message = "Specify module in server";

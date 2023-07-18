@@ -87,7 +87,7 @@ export async function init(args) {
   g_db_queue = Promise.resolve();
 }
 
-export async function destroy() {
+export async function shutdown() {
   k_log.warn("Waiting for pending db transactions to complete");
   const queue = g_db_queue;
   g_db_queue = null;

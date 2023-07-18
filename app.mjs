@@ -4,7 +4,6 @@ import * as m_https from "https";
 import minimist from "minimist";
 
 import * as m_client from "./client/index.mjs";
-import * as m_db from "./server/db.mjs"
 import * as m_log from "./server/log.mjs";
 import * as m_server from "./server/index.mjs";
 
@@ -34,7 +33,6 @@ const hostname = "host" in args ? args.host : default_host;
 const port = "port" in args ? parseInt(args.port, 10) : default_port;
 
 const control_c_buffer = Buffer.from([0x03]);
-let control_c_already_pressed = false;
 
 k_log.info("Initializing...");
 await m_server.init(args);
@@ -83,21 +81,16 @@ server.listen(port, hostname, () => {
 
 process.stdin.on("data", async key => {
   if (key.compare(control_c_buffer) == 0) {
-    if (!control_c_already_pressed) {
-      control_c_already_pressed = true;
-      k_log.warn("\nGot Control+C. Exiting...");
-      // Closing everything we are using allows everything to shut down a bit more gracefully than
-      // just forcing the process to exit.
-      process.stdin.destroy();
-      k_log.info("Closing server...");
-      await new Promise(resolve => server.close(resolve));
-      k_log.info("Server closed. Closing database...");
-      await m_db.destroy();
-      k_log.info("Everything closed.");
-    } else {
-      k_log.warn("Second Control+C. Exiting more forcefully...");
-      process.exit(1);
-    }
+    k_log.warn("\nGot Control+C. Exiting...");
+    // Closing everything we are using allows everything to shut down a bit more gracefully than
+    // just forcing the process to exit.
+    process.stdin.setRawMode(false);
+    process.stdin.destroy();
+    k_log.info("Closing handlers and database...");
+    await m_server.shutdown();
+    k_log.info("Closing server...");
+    await new Promise(resolve => server.close(resolve));
+    k_log.info("Everything closed.");
   }
 });
 process.stdin.setRawMode(true);

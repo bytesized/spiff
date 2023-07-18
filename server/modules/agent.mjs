@@ -108,7 +108,7 @@ import * as m_log from "../log.mjs";
 import * as m_server_reset from "../server_reset.mjs";
 import * as m_utils from "../utils.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.warn, "server/agent");
+const k_log = new m_log.logger(m_log.e_log_level.info, "server/agent");
 
 const k_add_agent_command = "add";
 const k_get_all_command = "get_all";
@@ -192,90 +192,12 @@ export async function init(args) {
       }
     }
 
-    // Respect server reset behavior in case server reset id has changed.
-    const server_reset_behavior_int = await m_db.get_meta_int(
-      m_db.e_meta_int.agent_server_reset_behavior,
-      {already_within_transaction: true}
-    );
-    const server_reset_id = m_server_reset.current_server_reset_id();
-    const server_reset_behavior = k_int_to_server_reset_behavior[server_reset_behavior_int];
-    if (server_reset_behavior == m_agent_shared.e_server_reset_behavior.remove) {
-      await db.run("UPDATE agents SET removed = 1 WHERE server_reset_id != $server_reset_id", {
-        $server_reset_id: server_reset_id,
-      });
-    } else if (server_reset_behavior == m_agent_shared.e_server_reset_behavior.recreate) {
-      const agents = await db.all(
-        `
-          SELECT id, call_sign, faction
-          FROM agents
-          WHERE removed = 0 AND server_reset_id != $server_reset_id
-          ORDER BY id ASC;
-        `,
-        {$server_reset_id: server_reset_id}
-      );
-      const selected_id =
-        (await db.get("SELECT id FROM tagged_agents WHERE tag = $tag;",
-                      {$tag: k_agent_tag_id[e_agent_tag.selected_agent]}))?.id ?? null;
-
-      await db.run("UPDATE agents SET removed = 1 WHERE server_reset_id != $server_reset_id", {
-        $server_reset_id: server_reset_id,
-      });
-
-      const agent_lookup = {};
-      for (const agent of agents) {
-        agent_lookup[agent.call_sign] = agent;
-      }
-      const created_agents = {};
-      for (const call_sign in agent_lookup) {
-        const response = await m_api.register_agent(call_sign, agent_lookup[call_sign].faction);
-        if (response.success) {
-          created_agents[response.payload.data.agent.symbol] = {
-            faction: response.payload.data.agent.startingFaction,
-            auth_token: response.payload.data.token
-          };
-        }
-      }
-      for (const old_agent of agents) {
-        if ((old_agent.call_sign) in created_agents) {
-          const new_agent = created_agents[old_agent.call_sign];
-          const result = await db.run(
-            `
-              INSERT INTO agents (server_reset_id,  call_sign,  faction,  auth_token)
-                          VALUES ($server_reset_id, $call_sign, $faction, $auth_token);
-            `,
-            {
-              $server_reset_id: server_reset_id,
-              $call_sign: old_agent.call_sign,
-              $faction: new_agent.faction,
-              $auth_token: new_agent.auth_token,
-            }
-          );
-          if (old_agent.id == selected_id) {
-            await db.run("INSERT OR REPLACE INTO tagged_agents (tag, id) VALUES ($tag, $id);", {
-              $tag: k_agent_tag_id[e_agent_tag.selected_agent],
-              $id: result.lastID,
-            });
-          }
-        }
-      }
-    }
-
-    // If the selected agent has been removed, deselect it.
-    const result = await db.get(`
-        SELECT a.removed
-        FROM agents a
-        INNER JOIN tagged_agents t
-          ON a.id = t.id
-        WHERE t.tag = $tag
-      `,
-      {$tag: k_agent_tag_id[e_agent_tag.selected_agent]}
-    );
-    if (result != undefined && result.removed != 0) {
-      await db.run("DELETE FROM tagged_agents WHERE tag = $tag;", {
-        $tag: k_agent_tag_id[e_agent_tag.selected_agent],
-      });
-    }
+    enforce_server_reset_behavior({already_within_transaction: true});
   }, {with_transaction: true});
+
+  m_server_reset.add_reset_complete_listener(server_reset => {
+    enforce_server_reset_behavior();
+  });
 }
 
 /**
@@ -571,4 +493,101 @@ async function set_server_reset_behavior(server_reset_behavior,
   await m_db.set_meta_int(m_db.e_meta_int.agent_server_reset_behavior, server_reset_behavior_int,
                           {already_within_transaction});
   return {success: true};
+}
+
+async function enforce_server_reset_behavior({already_within_transaction = false} = {}) {
+  await m_db.enqueue(async db => {
+    const server_reset_behavior_int = await m_db.get_meta_int(
+      m_db.e_meta_int.agent_server_reset_behavior,
+      {already_within_transaction: true}
+    );
+    const server_reset_id = m_server_reset.current_server_reset_id();
+    const server_reset_behavior = k_int_to_server_reset_behavior[server_reset_behavior_int];
+    if (server_reset_behavior == m_agent_shared.e_server_reset_behavior.remove) {
+      k_log.info("Removing stale agents");
+      const result = await db.run(
+        "UPDATE agents SET removed = 1 WHERE server_reset_id != $server_reset_id AND removed = 0",
+        {$server_reset_id: server_reset_id}
+      );
+      k_log.info_if(result.changes > 0, "Removed", result.changes, "stale agents");
+    } else if (server_reset_behavior == m_agent_shared.e_server_reset_behavior.recreate) {
+      const agents = await db.all(
+        `
+          SELECT id, call_sign, faction
+          FROM agents
+          WHERE removed = 0 AND server_reset_id != $server_reset_id
+          ORDER BY id ASC;
+        `,
+        {$server_reset_id: server_reset_id}
+      );
+      const selected_id =
+        (await db.get("SELECT id FROM tagged_agents WHERE tag = $tag;",
+                      {$tag: k_agent_tag_id[e_agent_tag.selected_agent]}))?.id ?? null;
+
+      const result = await db.run(
+        "UPDATE agents SET removed = 1 WHERE server_reset_id != $server_reset_id AND removed = 0",
+        {$server_reset_id: server_reset_id}
+      );
+      k_log.info_if(result.changes > 0, "Removed", result.changes, "stale agents");
+
+      const agent_lookup = {};
+      for (const agent of agents) {
+        agent_lookup[agent.call_sign] = agent;
+      }
+      const created_agents = {};
+      for (const call_sign in agent_lookup) {
+        k_log.info("Recreating agent:", call_sign);
+        const response = await m_api.register_agent(call_sign, agent_lookup[call_sign].faction);
+        if (response.success) {
+          created_agents[response.payload.data.agent.symbol] = {
+            faction: response.payload.data.agent.startingFaction,
+            auth_token: response.payload.data.token
+          };
+          k_log.debug("Agent created successfully");
+        } else {
+          k_log.warn("Failed to recreate agent:", response.error_message);
+        }
+      }
+      for (const old_agent of agents) {
+        if ((old_agent.call_sign) in created_agents) {
+          const new_agent = created_agents[old_agent.call_sign];
+          const result = await db.run(
+            `
+              INSERT INTO agents (server_reset_id,  call_sign,  faction,  auth_token)
+                          VALUES ($server_reset_id, $call_sign, $faction, $auth_token);
+            `,
+            {
+              $server_reset_id: server_reset_id,
+              $call_sign: old_agent.call_sign,
+              $faction: new_agent.faction,
+              $auth_token: new_agent.auth_token,
+            }
+          );
+          if (old_agent.id == selected_id) {
+            await db.run("INSERT OR REPLACE INTO tagged_agents (tag, id) VALUES ($tag, $id);", {
+              $tag: k_agent_tag_id[e_agent_tag.selected_agent],
+              $id: result.lastID,
+            });
+          }
+        }
+      }
+    }
+
+    // If the selected agent has been removed, deselect it.
+    const result = await db.get(`
+        SELECT a.removed
+        FROM agents a
+        INNER JOIN tagged_agents t
+          ON a.id = t.id
+        WHERE t.tag = $tag
+      `,
+      {$tag: k_agent_tag_id[e_agent_tag.selected_agent]}
+    );
+    if (result != undefined && result.removed != 0) {
+      k_log.debug("Clearing selection from removed agent");
+      await db.run("DELETE FROM tagged_agents WHERE tag = $tag;", {
+        $tag: k_agent_tag_id[e_agent_tag.selected_agent],
+      });
+    }
+  }, {with_transaction: true, already_within_transaction});
 }
