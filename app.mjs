@@ -2,10 +2,12 @@ import {promises as m_fs} from "fs";
 import * as m_http from "http";
 import * as m_https from "https";
 import minimist from "minimist";
+import * as m_socket_io from "socket.io";
 
 import * as m_client from "./client/index.mjs";
 import * as m_log from "./server/log.mjs";
 import * as m_server from "./server/index.mjs";
+import * as m_server_events from "./server/server_events.mjs";
 
 const k_log = new m_log.logger(m_log.e_log_level.info, "app");
 
@@ -36,7 +38,6 @@ const control_c_buffer = Buffer.from([0x03]);
 
 k_log.info("Initializing...");
 await m_server.init(args);
-k_log.info("Initialization done.");
 
 async function handle_request(request, response) {
   try {
@@ -75,8 +76,15 @@ if (use_https) {
   server = m_http.createServer(server_options, handle_request);
 }
 
+const socket_io = new m_socket_io.Server(server);
+await m_server_events.init(args, socket_io);
+k_log.info("Initialization done.");
+
 server.listen(port, hostname, () => {
   k_log.info(`Started server at http://${hostname}:${port}/\n`);
+});
+server.listen(3000, hostname, () => {
+  k_log.info(`Started socket server at http://${hostname}:3000/\n`);
 });
 
 process.stdin.on("data", async key => {
@@ -87,8 +95,10 @@ process.stdin.on("data", async key => {
     process.stdin.setRawMode(false);
     process.stdin.destroy();
     k_log.info("Closing handlers and database...");
+    await m_server_events.shutdown();
     await m_server.shutdown();
     k_log.info("Closing server...");
+    socket_io.close();
     await new Promise(resolve => server.close(resolve));
     k_log.info("Everything closed.");
   }

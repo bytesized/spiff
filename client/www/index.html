@@ -27,12 +27,14 @@
     // make sure to import it early.
     import * as m_popup from "/client/js/popup.mjs";
 
-    import * as m_text_button_box from "/client/js/text_button_box.mjs";
     import * as m_page from "/client/js/page.mjs";
+    import * as m_text_button_box from "/client/js/text_button_box.mjs";
+    import * as m_server_events from "/client/js/server_events.mjs";
 
     window.addEventListener("DOMContentLoaded", async () => Promise.allSettled([
-      m_text_button_box.init(),
       m_page.init(),
+      m_text_button_box.init(),
+      m_server_events.init(),
     ]));
   </script>
 </head>

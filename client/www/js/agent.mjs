@@ -1,6 +1,7 @@
 import * as m_api from "./api.mjs";
 import * as m_log from "./log.mjs";
 import * as m_server from "./server.mjs";
+import * as m_server_events from "./server_events.mjs";
 import * as m_storage from "./storage.mjs";
 
 const k_log = new m_log.logger(m_log.e_log_level.warn, "agent");
@@ -40,23 +41,35 @@ export async function init() {
         k_storage_description
       );
 
-      const get_response = await m_server.agent.get_all();
-      if (!get_response.success) {
-        k_log.error("Failed to get agents from server", get_response);
-        throw new Error("Failed to get agents from server");
-      }
+      await refresh_available_agents();
 
-      for (const agent of get_response.result.agents) {
-        g_storage.add(agent);
-      }
-
-      // This is how we initialize the non-persisted data for the current agent.
-      // On failure, we just want to clear the current selection, but this function already
-      // effectively does that.
-      await set_selected(get_response.result.selected);
+      m_server_events.add_listener(
+        m_server_events.e_event_type.server_reset,
+        async server_reset => {
+          await refresh_available_agents()
+        }
+      );
     })();
   }
   return g_init_promise;
+}
+
+async function refresh_available_agents() {
+  const get_response = await m_server.agent.get_all();
+  await g_storage.clear();
+  if (!get_response.success) {
+    k_log.error("Failed to get agents from server", get_response);
+    throw new Error("Failed to get agents from server");
+  }
+
+  for (const agent of get_response.result.agents) {
+    g_storage.add(agent);
+  }
+
+  // This is how we initialize the non-persisted data for the current agent.
+  // On failure, we just want to clear the current selection, but this function already
+  // effectively does that.
+  await set_selected(get_response.result.selected);
 }
 
 async function add_agent_internal(auth_token, agent_data) {

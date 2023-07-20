@@ -1,6 +1,7 @@
 import * as m_api from "./api.mjs";
 import * as m_db from "./db.mjs";
 import * as m_log from "./log.mjs";
+import * as m_server_events from "./server_events.mjs";
 
 const k_log = new m_log.logger(m_log.e_log_level.info, "server_reset");
 
@@ -240,14 +241,22 @@ async function on_reset_timer_expired({already_within_transaction = false} = {})
         );
       }, {already_within_transaction});
 
+      start_reset_polling_timer();
+
       const arg = Object.freeze({
         previous_server_reset_id: old_server_reset_id,
         server_reset_id: g_current_server_reset_id,
       });
       for (const listener of g_complete_listeners) {
-        listener(arg);
+        try {
+          listener(arg);
+        } catch (ex) {
+          k_log.error(ex);
+        }
       }
-      return start_reset_polling_timer();
+
+      m_server_events.send(m_server_events.e_event_type.server_reset, arg);
+      return;
     }
   }
 
