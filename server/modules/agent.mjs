@@ -160,11 +160,12 @@ export async function init(args) {
         await db.run(`
           CREATE TABLE agents(
             id INTEGER PRIMARY KEY ASC,
-            server_reset_id NOT NULL REFERENCES server_reset(id),
+            server_reset_id INTEGER NOT NULL,
             call_sign TEXT NOT NULL,
             faction TEXT NOT NULL,
             auth_token TEXT NOT NULL,
-            removed INTEGER NOT NULL DEFAULT 0
+            removed INTEGER NOT NULL DEFAULT 0,
+            FOREIGN KEY(server_reset_id) REFERENCES server_reset(id)
           );
         `);
         await db.run(`
@@ -173,7 +174,8 @@ export async function init(args) {
         await db.run(`
           CREATE TABLE tagged_agents(
             tag INTEGER PRIMARY KEY ASC,
-            id NOT NULL REFERENCES agents(id)
+            id INTEGER NOT NULL,
+            FOREIGN KEY(id) REFERENCES agents(id)
           );
         `);
       }
