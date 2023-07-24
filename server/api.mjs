@@ -34,7 +34,7 @@ export async function get_systems(auth_token, page, {page_size = k_max_page_size
   return m_api_request.dispatch(
     "systems",
     {
-      query = `page=${page}&limit=${page_size}`,
+      query: `page=${page}&limit=${page_size}`,
       auth_token,
       priority: k_priority_int[e_priority.map_load]
     }
