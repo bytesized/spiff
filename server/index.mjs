@@ -1,3 +1,4 @@
+import * as m_agent from "./agent.mjs";
 import * as m_db from "./db.mjs";
 import * as m_log from "./log.mjs";
 import * as m_server_reset from "./server_reset.mjs";
@@ -13,6 +14,8 @@ export async function init(args) {
   await m_db.init(args);
   // Requires: m_db
   await m_server_reset.init(args);
+  // Requires: m_db
+  await m_agent.init();
 
   // Do module initialization last. They often depend on other things and nothing depends on them.
   for (const module_name in modules) {
