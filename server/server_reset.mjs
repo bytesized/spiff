@@ -3,7 +3,7 @@ import * as m_db from "./db.mjs";
 import * as m_log from "./log.mjs";
 import * as m_server_events from "./server_events.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.info, "server_reset");
+const k_log = new m_log.logger(m_log.e_log_level.info, "server/server_reset");
 
 const k_server_reset_db_current_version = 1;
 

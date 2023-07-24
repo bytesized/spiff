@@ -5,7 +5,7 @@
 import * as m_log from "./log.mjs";
 import * as m_server_events_shared from "../client/www/js/shared/server_events.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.info, "server_events");
+const k_log = new m_log.logger(m_log.e_log_level.info, "server/server_events");
 
 export const e_event_type = m_server_events_shared.e_event_type;
 
