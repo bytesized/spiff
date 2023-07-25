@@ -316,7 +316,7 @@ export async function get_server_reset_behavior({already_within_transaction = fa
  *        A value from `m_agent_shared.e_server_reset_behavior`.
  */
 export async function set_server_reset_behavior(server_reset_behavior,
-                                         {already_within_transaction = false} = {}) {
+                                                {already_within_transaction = false} = {}) {
   const server_reset_behavior_int = k_server_reset_behavior_to_int[server_reset_behavior];
   await m_db.set_meta_int(m_db.e_meta_int.agent_server_reset_behavior, server_reset_behavior_int,
                           {already_within_transaction});
