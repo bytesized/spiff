@@ -102,6 +102,9 @@ export async function init(args) {
  *          The agent's call sign. Property won't be present if `id` is `null`.
  *        auth_token
  *          The agent's authentication token. Property won't be present if `id` is `null`.
+ *        server_reset_id
+ *          Integer id representing the server reset period during which this agent was created.
+ *          Property won't be present if `id` is `null`.
  *    transaction_options
  *      An object containing the following properties:
  *        already_within_transaction
@@ -115,15 +118,20 @@ async function fire_change_agent_selection_listeners(id,
                                                      {
                                                       call_sign,
                                                       auth_token,
+                                                      server_reset_id,
                                                       already_within_transaction = false,
                                                      } = {}) {
-  if (id != null && (call_sign == undefined || auth_token == undefined)) {
+  if (id != null &&
+      (call_sign == undefined || auth_token == undefined || server_reset_id == undefined)
+  ) {
     await m_db.enqueue(async db => {
-      const result = await db.get("SELECT call_sign, auth_token FROM agents WHERE id = $id;", {
-        $id: id,
-      });
+      const result = await db.get(
+        "SELECT call_sign, auth_token, server_reset_id FROM agents WHERE id = $id;",
+        {$id: id}
+      );
       call_sign = result.call_sign;
       auth_token = result.auth_token;
+      server_reset_id = result.server_reset_id;
     }, {already_within_transaction});
   }
 
@@ -131,6 +139,7 @@ async function fire_change_agent_selection_listeners(id,
   if (id != null) {
     agent.call_sign = call_sign;
     agent.auth_token = auth_token;
+    agent.server_reset_id = server_reset_id;
   }
   const transaction_options = {already_within_transaction};
 
@@ -164,11 +173,12 @@ export async function add_agent(auth_token, {already_within_transaction = false}
   }
 
   await m_db.enqueue(async db => {
+    const server_reset_id = m_server_reset.current_server_reset_id();
     let result = await db.run(
       `INSERT INTO agents (server_reset_id,  call_sign,  faction,  auth_token)
                    VALUES ($server_reset_id, $call_sign, $faction, $auth_token);`,
       {
-        $server_reset_id: m_server_reset.current_server_reset_id(),
+        $server_reset_id: server_reset_id,
         $call_sign: call_sign,
         $faction: faction,
         $auth_token: auth_token,
@@ -186,7 +196,7 @@ export async function add_agent(auth_token, {already_within_transaction = false}
     if (response.result.selected) {
       await fire_change_agent_selection_listeners(
         agent_id,
-        {call_sign, auth_token, already_within_transaction: true}
+        {call_sign, auth_token, server_reset_id, already_within_transaction: true}
       );
     }
   }, {with_transaction: true, already_within_transaction});
@@ -232,6 +242,38 @@ export async function get_selected_agent_id({already_within_transaction = false}
     }
     return result.id;
   }, {already_within_transaction});
+}
+
+/**
+ * Returns `null` if no agent is selected. Otherwise returns an object containing these properties:
+ *  id
+ *    Integer identifier of the selected agent.
+ *  call_sign
+ *    String representing the call sign of the agent.
+ *  faction
+ *    String representing the faction the agent belongs to.
+ *  auth_token
+ *    String representing the authentication token for the agent.
+ *  server_reset_id
+ *    An integer representing the id of the server reset period during which the agent was created.
+ */
+export async function get_selected_agent({already_within_transaction = false} = {}) {
+  return m_db.enqueue(async db => {
+    const result = await db.get(
+      `
+        SELECT agents.id AS id, agents.call_sign AS call_sign, agents.faction AS faction,
+               agents.auth_token AS auth_token, agents.server_reset_id AS server_reset_id
+        FROM agents
+        INNER JOIN tagged_agents ON tagged_agents.id = agents.id
+        WHERE tag = $tag;
+      `,
+      {$tag: k_agent_tag_id[e_agent_tag.selected_agent]}
+    );
+    if (result == undefined) {
+      return null;
+    }
+    return result;
+  });
 }
 
 /**
@@ -325,6 +367,8 @@ export async function set_server_reset_behavior(server_reset_behavior,
 
 export async function enforce_server_reset_behavior({already_within_transaction = false} = {}) {
   await m_db.enqueue(async db => {
+    let selected_agent_changed_to = undefined;
+
     const server_reset_behavior_int = await m_db.get_meta_int(
       m_db.e_meta_int.agent_server_reset_behavior,
       {already_within_transaction: true}
@@ -396,6 +440,12 @@ export async function enforce_server_reset_behavior({already_within_transaction 
               $tag: k_agent_tag_id[e_agent_tag.selected_agent],
               $id: result.lastID,
             });
+            selected_agent_changed_to = {
+              id: result.lastID,
+              call_sign: old_agent.call_sign,
+              auth_token: new_agent.auth_token,
+              server_reset_id: server_reset_id,
+            };
           }
         }
       }
@@ -416,6 +466,23 @@ export async function enforce_server_reset_behavior({already_within_transaction 
       await db.run("DELETE FROM tagged_agents WHERE tag = $tag;", {
         $tag: k_agent_tag_id[e_agent_tag.selected_agent],
       });
+      selected_agent_changed_to = null;
+    }
+
+    if (selected_agent_changed_to != undefined) {
+      if (selected_agent_changed_to == null) {
+        await fire_change_agent_selection_listeners(null, {already_within_transaction: true});
+      } else {
+        await fire_change_agent_selection_listeners(
+          selected_agent_changed_to.id,
+          {
+            call_sign: selected_agent_changed_to.call_sign,
+            auth_token: selected_agent_changed_to.auth_token,
+            server_reset_id: selected_agent_changed_to.server_reset_id,
+            already_within_transaction: true
+          }
+        );
+      }
     }
   }, {with_transaction: true, already_within_transaction});
 }
