@@ -1,6 +1,6 @@
 import * as m_api_request from "./api_request.mjs";
 
-const k_max_page_size = 20;
+export const k_max_page_size = 20;
 
 const e_priority = Object.freeze({
   normal: "e_priority::normal",
