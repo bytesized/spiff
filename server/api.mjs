@@ -41,10 +41,9 @@ export async function get_systems(auth_token, page, {page_size = k_max_page_size
   );
 }
 
-export async function get_waypoints(auth_token, system, page,
+export async function get_waypoints(auth_token, system, page, priority,
                                     {
-                                      page_size = k_max_page_size,
-                                      priority = e_priority.map_load,
+                                      page_size = k_max_page_size
                                     } = {}) {
   return m_api_request.dispatch(
     `systems/${system}/waypoints`,
