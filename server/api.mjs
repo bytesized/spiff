@@ -36,7 +36,22 @@ export async function get_systems(auth_token, page, {page_size = k_max_page_size
     {
       query: `page=${page}&limit=${page_size}`,
       auth_token,
-      priority: k_priority_int[e_priority.map_load]
+      priority: k_priority_int[e_priority.map_load],
+    }
+  );
+}
+
+export async function get_waypoints(auth_token, system, page,
+                                    {
+                                      page_size = k_max_page_size,
+                                      priority = e_priority.map_load,
+                                    } = {}) {
+  return m_api_request.dispatch(
+    `systems/${system}/waypoints`,
+    {
+      query: `page=${page}&limit=${page_size}`,
+      auth_token,
+      priority: k_priority_int[priority],
     }
   );
 }
