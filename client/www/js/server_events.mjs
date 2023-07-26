@@ -32,3 +32,12 @@ export async function init() {
 export function add_listener(event, listener) {
   g_listeners[event].push(listener);
 }
+
+export function remove_listener(event, listener) {
+  const to_remove = g_listeners[event].findIndex(l => l === listener);
+  if (to_remove == -1) {
+    return false;
+  }
+  g_listeners[event].splice(to_remove, 1);
+  return true;
+}
