@@ -31,11 +31,27 @@
     import * as m_text_button_box from "/client/js/text_button_box.mjs";
     import * as m_server_events from "/client/js/server_events.mjs";
 
-    window.addEventListener("DOMContentLoaded", async () => Promise.allSettled([
-      m_page.init(),
-      m_text_button_box.init(),
-      m_server_events.init(),
-    ]));
+    window.addEventListener("DOMContentLoaded", async () => {
+      // Start init of components that don't have dependencies and other things don't depend on.
+      const init_promises = [];
+      init_promises.push(m_text_button_box.init());
+
+      // Init components that are used in page initialization.
+      await m_server_events.init();
+
+      // Add page initialization
+      init_promises.push(m_page.init());
+
+      // Wait on init results
+      const init_results = await Promise.allSettled(init_promises);
+
+      // Log errors
+      for (const init_result of init_results) {
+        if (init_result.status == "rejected") {
+          console.error(init_result.reason);
+        }
+      }
+    });
   </script>
 </head>
 <body>
