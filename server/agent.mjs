@@ -273,7 +273,7 @@ export async function get_selected_agent({already_within_transaction = false} = 
       return null;
     }
     return result;
-  });
+  }, {already_within_transaction});
 }
 
 /**
