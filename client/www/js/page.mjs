@@ -1,6 +1,7 @@
 import * as m_agent from "./agent.mjs";
 import * as m_agent_page from "./page/agent.mjs";
 import * as m_progress from "./progress.mjs";
+import * as m_server_events from "./server_events.mjs";
 import * as m_settings_page from "./page/settings.mjs";
 import * as m_storage from "./storage.mjs";
 
@@ -45,7 +46,7 @@ const k_page_el_id = Object.freeze({
 });
 
 const g_button_listener = {};
-const g_inited_pages = [];
+const g_inited_pages = new Set();
 let g_page_module_init_done = false;
 
 export async function init() {
@@ -54,7 +55,7 @@ export async function init() {
     if (page in k_page_init_fn) {
       init_promises.push(init_page(page));
     } else {
-      g_inited_pages.push(page);
+      g_inited_pages.add(page);
     }
   }
 
@@ -105,7 +106,30 @@ async function init_page(page) {
   if (progress_el) {
     progress_el.remove();
   }
-  g_inited_pages.push(page);
+  g_inited_pages.add(page);
+
+  if (k_page_init_fn[page].reinit_on_server_reset) {
+    const server_reset_listener = async server_reset => {
+      m_server_events.remove_listener(
+        m_server_events.e_event_type.server_reset,
+        server_reset_listener
+      );
+
+      g_inited_pages.delete(page);
+      disable_button(page);
+
+      const page_el = document.getElementById(k_page_el_id[page]);
+      if (page_el.classList.contains(k_active_page_class)) {
+        show_page(e_page.settings);
+      }
+
+      await init_page(page);
+    };
+    m_server_events.add_listener(
+      m_server_events.e_event_type.server_reset,
+      server_reset_listener
+    );
+  }
 
   const selected_agent = await m_agent.agents.get_selection_key();
   if (g_page_module_init_done && selected_agent != null) {
