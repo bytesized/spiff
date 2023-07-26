@@ -404,25 +404,28 @@ export async function enforce_server_reset_behavior({already_within_transaction 
 
       const agent_lookup = {};
       for (const agent of agents) {
-        agent_lookup[agent.call_sign] = agent;
+        agent_lookup[agent.call_sign.toLowerCase()] = agent;
       }
       const created_agents = {};
       for (const call_sign in agent_lookup) {
         k_log.info("Recreating agent:", call_sign);
         const response = await m_api.register_agent(call_sign, agent_lookup[call_sign].faction);
         if (response.success) {
-          created_agents[response.payload.data.agent.symbol] = {
+          created_agents[response.payload.data.agent.symbol.toLowerCase()] = {
             faction: response.payload.data.agent.startingFaction,
-            auth_token: response.payload.data.token
+            auth_token: response.payload.data.token,
+            call_sign: response.payload.data.agent.symbol,
           };
           k_log.debug("Agent created successfully");
         } else {
           k_log.warn("Failed to recreate agent:", response.error_message);
         }
       }
+      k_log.debug("Adding recreated agents");
       for (const old_agent of agents) {
-        if ((old_agent.call_sign) in created_agents) {
-          const new_agent = created_agents[old_agent.call_sign];
+        if (old_agent.call_sign.toLowerCase() in created_agents) {
+          k_log.debug("Adding recreated agent:", old_agent.call_sign);
+          const new_agent = created_agents[old_agent.call_sign.toLowerCase()];
           const result = await db.run(
             `
               INSERT INTO agents (server_reset_id,  call_sign,  faction,  auth_token)
@@ -430,7 +433,7 @@ export async function enforce_server_reset_behavior({already_within_transaction 
             `,
             {
               $server_reset_id: server_reset_id,
-              $call_sign: old_agent.call_sign,
+              $call_sign: new_agent.call_sign,
               $faction: new_agent.faction,
               $auth_token: new_agent.auth_token,
             }
@@ -447,6 +450,8 @@ export async function enforce_server_reset_behavior({already_within_transaction 
               server_reset_id: server_reset_id,
             };
           }
+        } else {
+          k_log.debug("Agent not recreated:", old_agent.call_sign);
         }
       }
     }
