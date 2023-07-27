@@ -20,6 +20,7 @@ export const e_meta_int = {
   server_reset_version: "e_meta_int::server_reset_version",
   agent_module_version: "e_meta_int::agent_module_version",
   agent_server_reset_behavior: "e_meta_int::agent_server_reset_behavior",
+  star_chart_module_version: "e_meta_int::star_chart_module_version",
 };
 
 // These must be unique integers
@@ -28,6 +29,7 @@ const k_meta_int_key = {
   [e_meta_int.server_reset_version]: 2,
   [e_meta_int.agent_module_version]: 3,
   [e_meta_int.agent_server_reset_behavior]: 4,
+  [e_meta_int.star_chart_module_version]: 5,
 };
 
 export async function init(args) {

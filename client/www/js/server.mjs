@@ -86,3 +86,9 @@ export const agent = Object.freeze({
     return dispatch("agent/set_server_reset_behavior", {server_reset_behavior});
   },
 });
+
+export const star_chart = Object.freeze({
+  async status() {
+    return dispatch("star_chart/status");
+  }
+});

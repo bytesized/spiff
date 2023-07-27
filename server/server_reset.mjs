@@ -24,6 +24,16 @@ let g_server_reset_poll_timer;
 let g_start_listeners = [];
 let g_complete_listeners = [];
 
+// Enumerated components that can be passed to `get_component_is_up_to_date()` and
+// `set_component_is_up_to_date()`.
+export const e_component = Object.freeze({
+  star_chart: "e_component::star_chart",
+});
+
+const k_component_int = Object.freeze({
+  [e_component.star_chart]: 1,
+});
+
 export async function init(args) {
   const metadata_response = await m_api.get_metadata();
   if (!metadata_response.success) {
@@ -60,6 +70,13 @@ export async function init(args) {
             id INTEGER PRIMARY KEY ASC,
             last_reset TEXT NOT NULL,
             next_reset TEXT
+          );
+        `);
+        await db.run(`
+          CREATE TABLE server_reset_by_component(
+            component_id INTEGER PRIMARY KEY ASC,
+            server_reset_id INTEGER NOT NULL,
+            FOREIGN KEY (server_reset_id) REFERENCES server_reset(id)
           );
         `);
       }
@@ -249,7 +266,7 @@ async function on_reset_timer_expired({already_within_transaction = false} = {})
       });
       for (const listener of g_complete_listeners) {
         try {
-          listener(arg);
+          await listener(arg);
         } catch (ex) {
           k_log.error(ex);
         }
@@ -263,4 +280,26 @@ async function on_reset_timer_expired({already_within_transaction = false} = {})
   const delay = Math.max(0, g_next_poll_time - now);
   k_log.debug("Waiting for server reset. Next poll in", () => human_readable_duration(delay));
   g_server_reset_poll_timer = setTimeout(on_reset_timer_expired, delay);
+}
+
+export async function get_component_is_up_to_date(component,
+                                                  {already_within_transaction = false} = {}) {
+  return m_db.enqueue(async db => {
+    const result = await db.get(
+      "SELECT server_reset_id FROM server_reset_by_component WHERE component_id = $component_id",
+      {$component_id: k_component_int[component]}
+    );
+    return result != undefined && result.server_reset_id == g_current_server_reset_id;
+  }, {already_within_transaction});
+}
+
+export async function set_component_is_up_to_date(component,
+                                                  {already_within_transaction = false} = {}) {
+  await m_db.enqueue(async db => {
+    await db.run(
+      `INSERT OR REPLACE INTO server_reset_by_component (component_id,  server_reset_id)
+                                                 VALUES ($component_id, $server_reset_id)`,
+      {$component_id: k_component_int[component], $server_reset_id: g_current_server_reset_id}
+    );
+  }, {already_within_transaction});
 }

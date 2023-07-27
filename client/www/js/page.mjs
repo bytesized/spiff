@@ -3,6 +3,7 @@ import * as m_agent_page from "./page/agent.mjs";
 import * as m_progress from "./progress.mjs";
 import * as m_server_events from "./server_events.mjs";
 import * as m_settings_page from "./page/settings.mjs";
+import * as m_star_chart_page from "./page/star_chart.mjs";
 import * as m_storage from "./storage.mjs";
 
 const k_page_class = "page";
@@ -29,6 +30,7 @@ const k_page_button_id = {
 const k_page_init_fn = Object.freeze({
   [e_page.settings]: {fn: m_settings_page.init},
   [e_page.agent]: {fn: m_agent_page.init},
+  [e_page.star_chart]: {fn: m_star_chart_page.init, progress: true, reinit_on_server_reset: true},
 });
 
 const k_page_disabled_if_no_agent_selected = Object.freeze({
