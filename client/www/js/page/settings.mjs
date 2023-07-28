@@ -175,7 +175,7 @@ async function select_agent(clicked) {
 async function remove_agent(clicked) {
   m_list.set_busy(clicked.list);
   const agent = await m_agent.agents.get(clicked.id);
-  let popup_button = await m_popup.show({
+  const close = await m_popup.show({
     title: "Remove Agent?",
     message:
       `Are you sure you want to remove agent "${m_agent.format_call_sign(agent.call_sign)}"? If ` +
@@ -184,13 +184,11 @@ async function remove_agent(clicked) {
     buttons: [m_popup.e_button.yes, m_popup.e_button.no],
     allow_non_button_close: true,
   });
-  if (popup_button != m_popup.e_button.yes) {
-    m_list.clear_busy(clicked.list);
-    return;
-  }
-  const response = await m_agent.remove(clicked.id);
-  if (!response.success) {
-    await m_error.show_api_failure_popup(response);
+  if (close.reason == m_popup.e_close_reason.button && close.button == m_popup.e_button.yes) {
+    const response = await m_agent.remove(clicked.id);
+    if (!response.success) {
+      await m_error.show_api_failure_popup(response);
+    }
   }
   m_list.clear_busy(clicked.list);
 }

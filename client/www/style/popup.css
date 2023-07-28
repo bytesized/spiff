@@ -16,13 +16,16 @@
 }
 
 #popup {
+  --popup_border_width: 0.1rem;
+  --popup_padding: 2rem;
+
   background-color: var(--background_color);
   opacity: 1;
   border-style: solid;
-  border-width: 0.1rem;
+  border-width: var(--popup_border_width);
   border-color: var(--border_color);
   border-radius: 3rem;
-  padding: 2rem;
+  padding: var(--popup_padding);
   width: 45rem;
   max-width: 100%;
 }
@@ -54,4 +57,9 @@
 
 .popup_button_box_spacer {
   flex: 1;
+}
+
+#popup.max_size {
+  height: calc(100vh - (2 * var(--popup_border_width)) - (2 * var(--popup_padding)) - 1rem);
+  width: calc(100vw - (2 * var(--popup_border_width)) - (2 * var(--popup_padding)) - 1rem);
 }
