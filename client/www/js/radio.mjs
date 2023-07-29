@@ -33,7 +33,7 @@ let g_next_radio_input_id = 0;
  *        If `true`, the radio buttons will be laid out horizontally rather than vertically.
  * @param selected_id
  *        If specified, 
- * @return
+ * @returns
  *        A DOM element containing the described radio buttons.
  */
 export function create(items, handler, {horizontal, selected_id} = {}) {

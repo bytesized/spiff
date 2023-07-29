@@ -61,7 +61,7 @@ let k_outdated_token_message_substr = "Token reset_date does not match the serve
  *        The priority at which the request will be serviced. The most priority is given to
  *        requests with priority `0`, which is the default. Higher priority values are serviced
  *        only after lower priority valued requests have completed.
- * @return
+ * @returns
  *        The return value will be an object with the following fields:
  *          success
  *            A boolean indicating whether or not the request completed successfully.
