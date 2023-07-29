@@ -96,11 +96,12 @@ export async function init() {
 }
 
 async function init_page(page) {
-  let args = [];
+  const page_el = document.getElementById(k_page_el_id[page]);
+  const args = [page_el];
   let progress_el;
   if (k_page_init_fn[page].progress) {
     progress_el = m_progress.create({padding: "0.1rem"});
-    let button = document.getElementById(k_page_button_id[page]);
+    const button = document.getElementById(k_page_button_id[page]);
     button.append(progress_el);
     args.push(progress_el);
   }
@@ -120,7 +121,6 @@ async function init_page(page) {
       g_inited_pages.delete(page);
       disable_button(page);
 
-      const page_el = document.getElementById(k_page_el_id[page]);
       if (page_el.classList.contains(k_active_page_class)) {
         show_page(e_page.settings);
       }

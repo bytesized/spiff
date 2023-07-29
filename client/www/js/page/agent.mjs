@@ -4,7 +4,7 @@ import * as m_storage from "../storage.mjs";
 
 const k_no_agent_selected_message = "<no agent selected>";
 
-export async function init() {
+export async function init(page_el) {
   await m_agent.init();
 
   m_storage.sync_el_text_with_selection_property(m_agent.agents, k_no_agent_selected_message, {
