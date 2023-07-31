@@ -83,11 +83,11 @@ export async function init(args) {
       }
     }
 
-    enforce_server_reset_behavior({already_within_transaction: true});
+    await enforce_server_reset_behavior({already_within_transaction: true});
   }, {with_transaction: true});
 
-  m_server_reset.add_reset_complete_listener(server_reset => {
-    enforce_server_reset_behavior();
+  m_server_reset.add_reset_complete_listener(async server_reset => {
+    await enforce_server_reset_behavior();
   });
 }
 
@@ -416,7 +416,8 @@ export async function enforce_server_reset_behavior({already_within_transaction 
             auth_token: response.payload.data.token,
             call_sign: response.payload.data.agent.symbol,
           };
-          k_log.debug("Agent created successfully");
+          // Log level of error because I want the token in the log in case this gets rolled back
+          k_log.error("Agent created successfully", response.payload.data.token);
         } else {
           k_log.warn("Failed to recreate agent:", response.error_message);
         }

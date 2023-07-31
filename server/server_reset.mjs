@@ -104,17 +104,16 @@ export async function init(args) {
         $id: g_current_server_reset_id,
       });
       if (result.last_reset != g_last_reset_time) {
-        const new_id = g_current_server_reset_id + 1;
-        k_log.info("Server reset since last run", g_current_server_reset_id, "->", new_id);
         result = await db.run(
           `INSERT INTO server_reset(id,  last_reset,  next_reset)
                             VALUES ($id, $last_reset, $next_reset);`,
           {
-            $id: new_id,
+            $id: g_current_server_reset_id + 1,
             $last_reset: g_last_reset_time,
             $next_reset: next_reset_string,
           }
         );
+        k_log.info("Server reset since last run", g_current_server_reset_id, "->", result.lastID);
         g_current_server_reset_id = result.lastID;
       }
     }

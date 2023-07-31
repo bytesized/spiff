@@ -249,8 +249,12 @@ async function start_chart_load(auth_token, server_reset_id) {
     throw new Error("Cannot start loading the star chart - component has shut down");
   }
 
-  if (server_reset_id != m_server_reset.current_server_reset_id()) {
-    k_log.error("Cannot start loading the star chart - agent is out-of-date");
+  const current_server_reset_id = m_server_reset.current_server_reset_id();
+  if (server_reset_id != current_server_reset_id) {
+    k_log.error(
+      "Cannot start loading the star chart - agent is out-of-date", server_reset_id, "!=",
+      current_server_reset_id
+    );
     throw new Error("Cannot start loading the star chart - agent is out-of-date");
   }
 
