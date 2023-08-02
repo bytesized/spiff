@@ -95,10 +95,10 @@ export async function init(args) {
         `);
         await db.run(`
           CREATE TABLE waypoint_orbit(
+            orbital INTEGER PRIMARY KEY ASC,
             orbited INTEGER NOT NULL,
-            orbital INTEGER NOT NULL,
-            FOREIGN KEY (orbited) REFERENCES waypoint(id),
-            FOREIGN KEY (orbital) REFERENCES waypoint(id)
+            FOREIGN KEY (orbital) REFERENCES waypoint(id),
+            FOREIGN KEY (orbited) REFERENCES waypoint(id)
           );
         `);
         await db.run(`
@@ -453,107 +453,13 @@ async function start_chart_load(auth_token, server_reset_id) {
         }
       }
 
-      const waypoints = [];
-      let page = 1;
-      while (true) {
-        if (g_has_shutdown || g_load_cancellation_in_progress) {
-          return;
-        }
-
-        const response =
-          await m_api.get_waypoints(auth_token, system.symbol, page, m_api.e_priority.map_load);
-
-        if (!response.success) {
-          handle_chart_load_error(
-            `Failed to get waypoints for ${system.symbol} (p=${page}): ${response.error_message}`
-          );
-          return;
-        }
-        waypoints.push(...response.payload.data);
-        if (waypoints.length >= response.payload.meta.total) {
-          break;
-        }
-        page += 1;
+      const result = await load_system_data(auth_token, system.symbol, system.id,
+                                            m_api.e_priority.map_load);
+      if (!result.success) {
+        handle_chart_load_error(result.error_message);
+        return;
       }
 
-      await m_db.enqueue(async db => {
-        const waypoint_id_lookup = {};
-        for (const waypoint of waypoints) {
-          let result = await db.get("SELECT id FROM waypoint_type WHERE symbol = $symbol;", {
-            $symbol: waypoint.type,
-          });
-          let type_id;
-          if (result != undefined) {
-            type_id = result.id;
-          } else {
-            result = await db.run("INSERT INTO waypoint_type(symbol) VALUES ($symbol);", {
-              $symbol: waypoint.type,
-            });
-            type_id = result.lastID;
-          }
-
-          result = await db.run(
-            `
-              INSERT INTO waypoint(system_id,  symbol,  type_id,  x,  y)
-                           VALUES ($system_id, $symbol, $type_id, $x, $y);
-            `,
-            {
-              $system_id: system.id,
-              $symbol: waypoint.symbol,
-              $type_id: type_id,
-              $x: waypoint.x,
-              $y: waypoint.y,
-            }
-          );
-          const waypoint_id = result.lastID;
-          waypoint_id_lookup[waypoint.symbol] = waypoint_id;
-
-          for (const trait of waypoint.traits) {
-            result = await db.get("SELECT id FROM waypoint_trait_type WHERE symbol = $symbol", {
-              $symbol: trait.symbol,
-            });
-            let trait_id;
-            if (result != undefined) {
-              trait_id = result.id;
-            } else {
-              result = await db.run(
-                `
-                  INSERT INTO waypoint_trait_type(symbol,  name,  description)
-                                          VALUES ($symbol, $name, $description);
-                `,
-                {
-                  $symbol: trait.symbol,
-                  $name: trait.name,
-                  $description: trait.description,
-                }
-              );
-              trait_id = result.lastID;
-            }
-            await db.run(
-              "INSERT INTO waypoint_trait(waypoint_id, trait_id) VALUES ($waypoint_id, $trait_id)",
-              {$waypoint_id: waypoint_id, $trait_id: trait_id}
-            );
-          }
-        }
-
-        for (const waypoint of waypoints) {
-          for (const orbital of waypoint.orbitals) {
-            await db.run(
-              "INSERT INTO waypoint_orbit(orbited, orbital) VALUES ($orbited, $orbital);",
-              {
-                $orbited: waypoint_id_lookup[waypoint.symbol],
-                $orbital: waypoint_id_lookup[orbital.symbol],
-              }
-            );
-          }
-        }
-
-        await db.run("UPDATE waypoint_load SET loaded = 1 WHERE system_id = $system_id;", {
-          $system_id: system.id,
-        });
-      }, {with_transaction: true});
-
-      g_system_waypoints_loaded += 1;
       k_log.debug(
         "Successfully loaded waypoints for system", system.symbol, "(", g_system_waypoints_loaded,
         "out of", g_system_count, ")"
@@ -582,4 +488,267 @@ export function status() {
     result.system_waypoints_loaded = g_system_waypoints_loaded;
   }
   return result;
+}
+
+async function load_system_data(
+  auth_token, system_symbol, system_id, priority, {already_within_transaction} = {}
+) {
+  const waypoints = [];
+  let page = 1;
+  while (true) {
+    if (g_has_shutdown || g_load_cancellation_in_progress) {
+      return;
+    }
+
+    const response = await m_api.get_waypoints(auth_token, system_symbol, page, priority);
+
+    if (!response.success) {
+      return {
+        success: false,
+        error_message:
+          `Failed to get waypoints for ${system_symbol} (p=${page}): ${response.error_message}`,
+      };
+      return;
+    }
+    waypoints.push(...response.payload.data);
+    if (waypoints.length >= response.payload.meta.total) {
+      break;
+    }
+    page += 1;
+  }
+
+  return m_db.enqueue(async db => {
+    // Querying the API without a lock on the database means that there is potentially a race
+    // condition here where we'd try to add the same system data twice.
+    // If the data is already in the table, we'll consider our job to have been done successfully.
+    let result = await db.get("SELECT loaded FROM waypoint_load WHERE system_id = $system_id;", {
+      $system_id: system_id,
+    });
+    if (result.loaded != 0) {
+      return {success: true};
+    }
+
+    const waypoint_id_lookup = {};
+    for (const waypoint of waypoints) {
+      result = await db.get("SELECT id FROM waypoint_type WHERE symbol = $symbol;", {
+        $symbol: waypoint.type,
+      });
+      let type_id;
+      if (result != undefined) {
+        type_id = result.id;
+      } else {
+        result = await db.run("INSERT INTO waypoint_type(symbol) VALUES ($symbol);", {
+          $symbol: waypoint.type,
+        });
+        type_id = result.lastID;
+      }
+
+      result = await db.run(
+        `
+          INSERT INTO waypoint(system_id,  symbol,  type_id,  x,  y)
+                       VALUES ($system_id, $symbol, $type_id, $x, $y);
+        `,
+        {
+          $system_id: system_id,
+          $symbol: waypoint.symbol,
+          $type_id: type_id,
+          $x: waypoint.x,
+          $y: waypoint.y,
+        }
+      );
+      const waypoint_id = result.lastID;
+      waypoint_id_lookup[waypoint.symbol] = waypoint_id;
+
+      for (const trait of waypoint.traits) {
+        result = await db.get("SELECT id FROM waypoint_trait_type WHERE symbol = $symbol", {
+          $symbol: trait.symbol,
+        });
+        let trait_id;
+        if (result != undefined) {
+          trait_id = result.id;
+        } else {
+          result = await db.run(
+            `
+              INSERT INTO waypoint_trait_type(symbol,  name,  description)
+                                      VALUES ($symbol, $name, $description);
+            `,
+            {
+              $symbol: trait.symbol,
+              $name: trait.name,
+              $description: trait.description,
+            }
+          );
+          trait_id = result.lastID;
+        }
+        await db.run(
+          "INSERT INTO waypoint_trait(waypoint_id, trait_id) VALUES ($waypoint_id, $trait_id)",
+          {$waypoint_id: waypoint_id, $trait_id: trait_id}
+        );
+      }
+    }
+
+    for (const waypoint of waypoints) {
+      for (const orbital of waypoint.orbitals) {
+        await db.run(
+          "INSERT INTO waypoint_orbit(orbital, orbited) VALUES ($orbital, $orbited);",
+          {
+            $orbital: waypoint_id_lookup[orbital.symbol],
+            $orbited: waypoint_id_lookup[waypoint.symbol],
+          }
+        );
+      }
+    }
+
+    await db.run("UPDATE waypoint_load SET loaded = 1 WHERE system_id = $system_id;", {
+      $system_id: system_id,
+    });
+    g_system_waypoints_loaded += 1;
+
+    return {success: true};
+  }, {with_transaction: true, already_within_transaction});
+}
+
+export async function get_sibling_waypoints(
+  auth_token, waypoint_symbol, {already_within_transaction} = {}
+) {
+  let system_id;
+  let system_symbol;
+  let waypoint_data_loaded;
+  let result = await m_db.enqueue(async db => {
+    let db_result = await db.get("SELECT system_id FROM waypoint WHERE symbol = $symbol;", {
+      $symbol: waypoint_symbol,
+    });
+
+    waypoint_data_loaded = db_result != undefined;
+    if (waypoint_data_loaded) {
+      system_id = db_result.system_id;
+      db_result = await db.get("SELECT symbol FROM system WHERE id = $id;", {
+        $id: system_id,
+      });
+      system_symbol = db_result.symbol;
+    } else {
+      const waypoint_parts = waypoint_symbol.split("-");
+      if (waypoint_parts.length != 3) {
+        return {
+          success: false,
+          error_message: `Waypoint "${waypoint_symbol}" does not have the expected format`,
+        };
+      }
+      system_symbol = waypoint_parts[0] + "-" + waypoint_parts[1];
+      db_result = await db.get("SELECT id FROM system WHERE symbol = $symbol;", {
+        $symbol: system_symbol,
+      });
+      if (db_result == undefined) {
+        return {
+          success: false,
+          error_message: `Unknown system: "${system_symbol}"`,
+        }
+      }
+      system_id = db_result.id;
+    }
+
+    return {success: true};
+  }, {with_transaction: true, already_within_transaction});
+  if (!result.success) {
+    return result;
+  }
+
+  const waypoint_result = await get_system_waypoints_internal(
+    auth_token, system_symbol, system_id, waypoint_data_loaded, {already_within_transaction}
+  );
+  if (!waypoint_result.success) {
+    return waypoint_result;
+  }
+
+  return {success: true, system_symbol, waypoints: waypoint_result.result};
+}
+
+export async function get_system_waypoints(
+  auth_token, system_symbol, {already_within_transaction} = {}
+) {
+  let system_id;
+  let waypoint_data_loaded;
+  const result = await m_db.enqueue(async db => {
+    let db_result = await db.get("SELECT id FROM system WHERE symbol = $symbol;", {
+      $symbol: system_symbol
+    });
+    if (db_result == undefined) {
+      return {
+        success: false,
+        error_message: `Unknown system: "${system_symbol}"`,
+      };
+    }
+    system_id = db_result.id;
+
+    db_result = await db.get("SELECT loaded FROM waypoint_load WHERE system_id = $system_id;", {
+      $system_id: system_id,
+    });
+    waypoint_data_loaded = db_result.loaded != 0;
+
+    return {success: true};
+  }, {with_transaction: true, already_within_transaction});
+  if (!result.success) {
+    return result;
+  }
+
+  return get_system_waypoints_internal(
+    auth_token, system_symbol, system_id, waypoint_data_loaded, {already_within_transaction}
+  );
+}
+
+async function get_system_waypoints_internal(
+  auth_token, system_symbol, system_id, waypoint_data_loaded, {already_within_transaction} = {}
+) {
+  if (!waypoint_data_loaded) {
+    const result = await load_system_data(
+      auth_token, system_symbol, system_id, m_api.e_priority.normal, {already_within_transaction}
+    );
+    if (!result.success) {
+      return result;
+    }
+  }
+
+  return m_db.enqueue(async db => {
+    const waypoints = await db.all(
+      `
+        SELECT waypoint.id AS id, waypoint.symbol AS symbol, waypoint.type_id AS type_id,
+               waypoint_type.symbol AS type_symbol
+        FROM waypoint
+        INNER JOIN waypoint_type ON waypoint_type.id = waypoint.type_id
+        WHERE waypoint.system_id = $system_id;
+      `,
+      {$system_id: system_id}
+    );
+    const waypoint_map = {};
+    for (const waypoint of waypoints) {
+      waypoint.traits = await db.all(
+        `
+          SELECT waypoint_trait_type.symbol AS symbol, waypoint_trait_type.name AS name,
+                 waypoint_trait_type.description AS description
+          FROM waypoint_trait
+          INNER JOIN waypoint_trait_type ON waypoint_trait.trait_id = waypoint_trait_type.id
+          WHERE waypoint_trait.waypoint_id = $waypoint_id;
+        `,
+        {$waypoint_id: waypoint.id}
+      );
+
+      const result = await db.get(
+        `
+          SELECT waypoint.symbol AS orbits
+          FROM waypoint_orbit
+          INNER JOIN waypoint ON waypoint.id = waypoint_orbit.orbited
+          WHERE waypoint_orbit.orbital = $waypoint_id;
+        `,
+        {$waypoint_id: waypoint.id}
+      );
+      if (result != undefined) {
+        waypoint.orbits = result.orbits;
+      } else {
+        waypoint.orbits = null;
+      }
+
+      waypoint_map[waypoint.symbol] = waypoint;
+    }
+    return {success: true, result: waypoint_map};
+  }, {with_transaction: true, already_within_transaction});
 }

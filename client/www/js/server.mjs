@@ -90,5 +90,13 @@ export const agent = Object.freeze({
 export const star_chart = Object.freeze({
   async status() {
     return dispatch("star_chart/status");
-  }
+  },
+
+  async waypoints(auth_token, system_symbol) {
+    return dispatch("star_chart/waypoints", {auth_token, system_symbol});
+  },
+
+  async sibling_waypoints(auth_token, waypoint_symbol) {
+    return dispatch("star_chart/sibling_waypoints", {auth_token, waypoint_symbol});
+  },
 });

@@ -30,6 +30,88 @@
  *            loaded so far. when this is equal to `system_count`, all waypoints have been loaded.
  *      error_message
  *        Present if `success == false`. A string error message indicating why the request failed.
+ *
+ *  server/star_chart/waypoints
+ *    Gets the waypoints in a system. This should not be used until all systems have been loaded
+ *    (`server/star_chart/status` returns `initialized && total_pages_needed == pages_loaded`).
+ *
+ *    Parameters:
+ *      auth_token
+ *        The authentication token to use to load star chart data from the ST servers, if
+ *        necessary.
+ *      system_symbol
+ *        A string symbol indicating the system to retrieve the waypoints for.
+ *    Return Format:
+ *      success
+ *        Boolean indicating whether or not the request succeeded.
+ *      result
+ *        Present if `success == true`. Will be an object containing one entry per waypoint. For
+ *        each, the key will be the waypoint symbol and the value will be an object with these
+ *        keys:
+ *          id
+ *            The database id of the waypoint.
+ *          orbits
+ *            If this waypoint orbits another waypoint, this will be the symbol of the waypoint
+ *            that it orbits. Otherwise this will be `null`.
+ *          symbol
+ *            The symbol of the waypoint.
+ *          traits
+ *            An array of waypoint trait objects, each of which have these keys:
+ *              symbol
+ *                The trait symbol.
+ *              name
+ *                The name of the trait.
+ *              description
+ *                The description of the trait.
+ *          type_id
+ *            The database id of the type of this waypoint.
+ *          type_symbol
+ *            The symbol of the waypoint type.
+ *      error_message
+ *        Present if `success == false`. A string error message indicating why the request failed.
+ *
+ *  server/star_chart/sibling_waypoints
+ *    Gets all the waypoints in the same system as a given waypoint. This should not be used until
+ *    all systems have been loaded (`server/star_chart/status` returns
+ *    `initialized && total_pages_needed == pages_loaded`).
+ *
+ *    Parameters:
+ *      auth_token
+ *        The authentication token to use to load star chart data from the ST servers, if
+ *        necessary.
+ *      waypoint_symbol
+ *        A string symbol indicating the waypoints to retrieve the siblings of.
+ *    Return Format:
+ *      success
+ *        Boolean indicating whether or not the request succeeded.
+ *      result
+ *        Present if `success == true`. Will be an object containing these keys:
+ *          system_symbol
+ *            The symbol for the system containing all the returned waypoints.
+ *          waypoints
+ *            An object containing one entry per waypoint. For each, the key will be the waypoint
+ *            symbol and the value will be an object with these keys:
+ *              id
+ *                The database id of the waypoint.
+ *              orbits
+ *                If this waypoint orbits another waypoint, this will be the symbol of the waypoint
+ *                that it orbits. Otherwise this will be `null`.
+ *              symbol
+ *                The symbol of the waypoint.
+ *              traits
+ *                An array of waypoint trait objects, each of which have these keys:
+ *                  symbol
+ *                    The trait symbol.
+ *                  name
+ *                    The name of the trait.
+ *                  description
+ *                    The description of the trait.
+ *              type_id
+ *                The database id of the type of this waypoint.
+ *              type_symbol
+ *                The symbol of the waypoint type.
+ *      error_message
+ *        Present if `success == false`. A string error message indicating why the request failed.
  */
 import * as m_log from "../log.mjs";
 import * as m_star_chart from "../star_chart.mjs";
@@ -38,6 +120,8 @@ import * as m_utils from "../utils.mjs";
 const k_log = new m_log.logger(m_log.e_log_level.warn, "server/modules/star_chart");
 
 const k_status_command = "status";
+const k_waypoints_command = "waypoints";
+const k_sibling_waypoints_command = "sibling_waypoints";
 
 export async function handle(url, path_parts, request, request_body, response) {
   if (path_parts.length < 1) {
@@ -55,6 +139,16 @@ export async function handle(url, path_parts, request, request_body, response) {
   if (command == k_status_command) {
     const result = m_star_chart.status();
     const response_object = {success: true, result};
+    m_utils.respond_success(k_log, response, response_object);
+    return;
+  } else if (command == k_waypoints_command) {
+    const response_object = await m_star_chart.get_system_waypoints(request_body.auth_token,
+                                                                    request_body.system_symbol);
+    m_utils.respond_success(k_log, response, response_object);
+    return;
+  } else if (command == k_sibling_waypoints_command) {
+    const response_object = await m_star_chart.get_sibling_waypoints(request_body.auth_token,
+                                                                     request_body.waypoint_symbol);
     m_utils.respond_success(k_log, response, response_object);
     return;
   }
