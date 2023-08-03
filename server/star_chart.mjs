@@ -817,3 +817,43 @@ async function get_system_waypoints_internal(
     return {success: true, result: {system, waypoints: waypoint_map}};
   }, {with_transaction: true, already_within_transaction});
 }
+
+export async function get_local_systems(
+  min_x, max_x, min_y, max_y, {already_within_transaction} = {}
+) {
+  return m_db.enqueue(async db => {
+    const systems = await db.all(
+      `
+        SELECT sector.id AS sector_id, sector.symbol AS sector_symbol, system_type.id AS type_id,
+               system_type.symbol AS type_symbol, system.id AS id, system.symbol AS symbol,
+               system.x AS x, system.y AS y
+        FROM system
+        INNER JOIN system_type ON system.type_id = system_type.id
+        INNER JOIN sector ON system.sector_id = sector.id
+        WHERE system.x BETWEEN $min_x AND $max_x AND
+              system.y BETWEEN $min_y AND $max_y;
+      `,
+      {$min_x: min_x, $max_x: max_x, $min_y: min_y, $max_y: max_y}
+    );
+    const system_map = {};
+    for (const system of systems) {
+      system_map[system.symbol] = {
+        sector: {
+          id: system.sector_id,
+          symbol: system.sector_symbol,
+        },
+        type: {
+          id: system.type_id,
+          symbol: system.type_symbol,
+        },
+        id: system.id,
+        symbol: system.symbol,
+        position: {
+          x: system.x,
+          y: system.y,
+        },
+      };
+    }
+    return {success: true, result: system_map};
+  }, {already_within_transaction})
+}

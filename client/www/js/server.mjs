@@ -99,4 +99,8 @@ export const star_chart = Object.freeze({
   async sibling_waypoints(auth_token, waypoint_symbol) {
     return dispatch("star_chart/sibling_waypoints", {auth_token, waypoint_symbol});
   },
+
+  async local_systems(min_x, max_x, min_y, max_y) {
+    return dispatch("star_chart/local_systems", {min_x, max_x, min_y, max_y});
+  },
 });

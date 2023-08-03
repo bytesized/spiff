@@ -141,6 +141,51 @@
  *                    The symbol of the waypoint type.
  *      error_message
  *        Present if `success == false`. A string error message indicating why the request failed.
+ *
+ *  server/star_chart/local_systems
+ *    Gets all the systems in a given rectangle. This probably should not be used until all systems
+ *    have been loaded (`server/star_chart/status` returns
+ *    `initialized && total_pages_needed == pages_loaded`).
+ *
+ *    Parameters:
+ *      min_x
+ *        Leftmost x coordinate of the rectangle to return systems in.
+ *      max_x
+ *        Rightmost x coordinate of the rectangle to return systems in.
+ *      min_y
+ *        Topmost y coordinate of the rectangle to return systems in.
+ *      max_y
+ *        Bottom-most y coordinate of the rectangle to return systems in.
+ *    Return Format:
+ *      success
+ *        Boolean indicating whether or not the request succeeded.
+ *      result
+ *        Present if `success == true`. Will be an object containing one entry per system. For
+ *        each, the key will be the system symbol and the value will be an object with these keys:
+ *          sector
+ *            An object describing the sector that the system is in. Will contain these keys:
+ *              id
+ *                The database id of the sector.
+ *              symbol
+ *                The symbol of the sector.
+ *          type
+ *            An object describing the type of system. Will contain these keys:
+ *              id
+ *                The database id of the system type.
+ *              symbol
+ *                The symbol of the system type.
+ *          id
+ *            The database id of the system.
+ *          symbol
+ *            The symbol representing the system.
+ *          position
+ *            An object describing the position of the system. Will contain these keys:
+ *              x
+ *                The x coordinate of the system.
+ *              y
+ *                The y coordinate of the system.
+ *      error_message
+ *        Present if `success == false`. A string error message indicating why the request failed.
  */
 import * as m_log from "../log.mjs";
 import * as m_star_chart from "../star_chart.mjs";
@@ -151,6 +196,7 @@ const k_log = new m_log.logger(m_log.e_log_level.warn, "server/modules/star_char
 const k_status_command = "status";
 const k_waypoints_command = "waypoints";
 const k_sibling_waypoints_command = "sibling_waypoints";
+const k_local_systems_command = "local_systems";
 
 export async function handle(url, path_parts, request, request_body, response) {
   if (path_parts.length < 1) {
@@ -178,6 +224,12 @@ export async function handle(url, path_parts, request, request_body, response) {
   } else if (command == k_sibling_waypoints_command) {
     const response_object = await m_star_chart.get_sibling_waypoints(request_body.auth_token,
                                                                      request_body.waypoint_symbol);
+    m_utils.respond_success(k_log, response, response_object);
+    return;
+  } else if (command == k_local_systems_command) {
+    const response_object = await m_star_chart.get_local_systems(
+      request_body.min_x, request_body.max_x, request_body.min_y, request_body.max_y
+    );
     m_utils.respond_success(k_log, response, response_object);
     return;
   }
