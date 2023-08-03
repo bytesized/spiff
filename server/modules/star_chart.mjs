@@ -75,10 +75,12 @@
  *                    The name of the trait.
  *                  description
  *                    The description of the trait.
- *              type_id
- *                The database id of the type of this waypoint.
- *              type_symbol
- *                The symbol of the waypoint type.
+ *              type
+ *                An object describing the type that the waypoint is in. Will contain these keys:
+ *                  id
+ *                    The database id of the type of this waypoint.
+ *                  symbol
+ *                    The symbol of the waypoint type.
  *      error_message
  *        Present if `success == false`. A string error message indicating why the request failed.
  *
@@ -127,10 +129,12 @@
  *                    The name of the trait.
  *                  description
  *                    The description of the trait.
- *              type_id
- *                The database id of the type of this waypoint.
- *              type_symbol
- *                The symbol of the waypoint type.
+ *              type
+ *                An object describing the type that the waypoint is in. Will contain these keys:
+ *                  id
+ *                    The database id of the type of this waypoint.
+ *                  symbol
+ *                    The symbol of the waypoint type.
  *      error_message
  *        Present if `success == false`. A string error message indicating why the request failed.
  */

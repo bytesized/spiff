@@ -770,6 +770,13 @@ async function get_system_waypoints_internal(
     );
     const waypoint_map = {};
     for (const waypoint of waypoints) {
+      waypoint.type = {
+        id: waypoint.type_id,
+        symbol: waypoint.type_symbol,
+      };
+      delete waypoint.type_id;
+      delete waypoint.type_symbol;
+
       waypoint.traits = await db.all(
         `
           SELECT waypoint_trait_type.symbol AS symbol, waypoint_trait_type.name AS name,
