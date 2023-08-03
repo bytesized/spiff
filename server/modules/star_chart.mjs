@@ -45,28 +45,40 @@
  *      success
  *        Boolean indicating whether or not the request succeeded.
  *      result
- *        Present if `success == true`. Will be an object containing one entry per waypoint. For
- *        each, the key will be the waypoint symbol and the value will be an object with these
- *        keys:
- *          id
- *            The database id of the waypoint.
- *          orbits
- *            If this waypoint orbits another waypoint, this will be the symbol of the waypoint
- *            that it orbits. Otherwise this will be `null`.
- *          symbol
- *            The symbol of the waypoint.
- *          traits
- *            An array of waypoint trait objects, each of which have these keys:
+ *        Present if `success == true`. Will be an object containing these keys:
+ *          system
+ *            An object describing the system that all the returned waypoints are in. It will
+ *            contain these keys:
+ *              id
+ *                The database id of the system.
  *              symbol
- *                The trait symbol.
- *              name
- *                The name of the trait.
- *              description
- *                The description of the trait.
- *          type_id
- *            The database id of the type of this waypoint.
- *          type_symbol
- *            The symbol of the waypoint type.
+ *                The symbol representing the system.
+ *              x
+ *                The x coordinate of the system.
+ *              y
+ *                The y coordinate of the system.
+ *          waypoints
+ *            An object containing one entry per waypoint. For each, the key will be the waypoint
+ *            symbol and the value will be an object with these keys:
+ *              id
+ *                The database id of the waypoint.
+ *              orbits
+ *                If this waypoint orbits another waypoint, this will be the symbol of the waypoint
+ *                that it orbits. Otherwise this will be `null`.
+ *              symbol
+ *                The symbol of the waypoint.
+ *              traits
+ *                An array of waypoint trait objects, each of which have these keys:
+ *                  symbol
+ *                    The trait symbol.
+ *                  name
+ *                    The name of the trait.
+ *                  description
+ *                    The description of the trait.
+ *              type_id
+ *                The database id of the type of this waypoint.
+ *              type_symbol
+ *                The symbol of the waypoint type.
  *      error_message
  *        Present if `success == false`. A string error message indicating why the request failed.
  *
@@ -86,8 +98,17 @@
  *        Boolean indicating whether or not the request succeeded.
  *      result
  *        Present if `success == true`. Will be an object containing these keys:
- *          system_symbol
- *            The symbol for the system containing all the returned waypoints.
+ *          system
+ *            An object describing the system that all the returned waypoints are in. It will
+ *            contain these keys:
+ *              id
+ *                The database id of the system.
+ *              symbol
+ *                The symbol representing the system.
+ *              x
+ *                The x coordinate of the system.
+ *              y
+ *                The y coordinate of the system.
  *          waypoints
  *            An object containing one entry per waypoint. For each, the key will be the waypoint
  *            symbol and the value will be an object with these keys:

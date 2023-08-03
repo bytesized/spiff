@@ -611,21 +611,18 @@ async function load_system_data(
 export async function get_sibling_waypoints(
   auth_token, waypoint_symbol, {already_within_transaction} = {}
 ) {
-  let system_id;
-  let system_symbol;
+  let system;
   let waypoint_data_loaded;
   let result = await m_db.enqueue(async db => {
-    let db_result = await db.get("SELECT system_id FROM waypoint WHERE symbol = $symbol;", {
+    const db_result = await db.get("SELECT system_id FROM waypoint WHERE symbol = $symbol;", {
       $symbol: waypoint_symbol,
     });
 
     waypoint_data_loaded = db_result != undefined;
     if (waypoint_data_loaded) {
-      system_id = db_result.system_id;
-      db_result = await db.get("SELECT symbol FROM system WHERE id = $id;", {
-        $id: system_id,
+      system = await db.get("SELECT id, symbol, x, y FROM system WHERE id = $id;", {
+        $id: db_result.system_id,
       });
-      system_symbol = db_result.symbol;
     } else {
       const waypoint_parts = waypoint_symbol.split("-");
       if (waypoint_parts.length != 3) {
@@ -634,17 +631,16 @@ export async function get_sibling_waypoints(
           error_message: `Waypoint "${waypoint_symbol}" does not have the expected format`,
         };
       }
-      system_symbol = waypoint_parts[0] + "-" + waypoint_parts[1];
-      db_result = await db.get("SELECT id FROM system WHERE symbol = $symbol;", {
+      const system_symbol = waypoint_parts[0] + "-" + waypoint_parts[1];
+      system = await db.get("SELECT id, symbol, x, y FROM system WHERE symbol = $symbol;", {
         $symbol: system_symbol,
       });
-      if (db_result == undefined) {
+      if (system == undefined) {
         return {
           success: false,
           error_message: `Unknown system: "${system_symbol}"`,
         }
       }
-      system_id = db_result.id;
     }
 
     return {success: true};
@@ -653,36 +649,31 @@ export async function get_sibling_waypoints(
     return result;
   }
 
-  const waypoint_result = await get_system_waypoints_internal(
-    auth_token, system_symbol, system_id, waypoint_data_loaded, {already_within_transaction}
+  return get_system_waypoints_internal(
+    auth_token, system, waypoint_data_loaded, {already_within_transaction}
   );
-  if (!waypoint_result.success) {
-    return waypoint_result;
-  }
-
-  return {success: true, system_symbol, waypoints: waypoint_result.result};
 }
 
 export async function get_system_waypoints(
   auth_token, system_symbol, {already_within_transaction} = {}
 ) {
-  let system_id;
+  let system;
   let waypoint_data_loaded;
   const result = await m_db.enqueue(async db => {
-    let db_result = await db.get("SELECT id FROM system WHERE symbol = $symbol;", {
+    system = await db.get("SELECT id, symbol, x, y FROM system WHERE symbol = $symbol;", {
       $symbol: system_symbol
     });
-    if (db_result == undefined) {
+    if (system == undefined) {
       return {
         success: false,
         error_message: `Unknown system: "${system_symbol}"`,
       };
     }
-    system_id = db_result.id;
 
-    db_result = await db.get("SELECT loaded FROM waypoint_load WHERE system_id = $system_id;", {
-      $system_id: system_id,
-    });
+    const db_result = await db.get(
+      "SELECT loaded FROM waypoint_load WHERE system_id = $system_id;",
+      {$system_id: system.id}
+    );
     waypoint_data_loaded = db_result.loaded != 0;
 
     return {success: true};
@@ -692,16 +683,74 @@ export async function get_system_waypoints(
   }
 
   return get_system_waypoints_internal(
-    auth_token, system_symbol, system_id, waypoint_data_loaded, {already_within_transaction}
+    auth_token, system, waypoint_data_loaded, {already_within_transaction}
   );
 }
 
+/**
+ * @param auth_token
+ *        The authentication token to use for retrieving waypoint data, if necessary.
+ * @param system
+ *        An object with these properties:
+ *          id
+ *            The system id.
+ *          symbol
+ *            The system symbol.
+ *          x
+ *            The x coordinate of the system.
+ *          y
+ *            The y coordinate of the system.
+ * @param waypoint_data_loaded
+ *        A boolean that should be `false` if the waypoint data for the system needs to be loaded
+ *        before we can retrieve and return it.
+ * @returns
+ *        An object with these properties:
+ *          success
+ *            A boolean indicating whether or not the function completed successfully.
+ *              result
+ *                Present if `success == true`. Will be an object containing these keys:
+ *                  system
+ *                    An object describing the system that all the returned waypoints are in. It
+ *                    will contain these keys:
+ *                      id
+ *                        The database id of the system.
+ *                      symbol
+ *                        The symbol representing the system.
+ *                      x
+ *                        The x coordinate of the system.
+ *                      y
+ *                        The y coordinate of the system.
+ *                  waypoints
+ *                    An object containing one entry per waypoint. For each, the key will be the
+ *                    waypoint symbol and the value will be an object with these keys:
+ *                      id
+ *                        The database id of the waypoint.
+ *                      orbits
+ *                        If this waypoint orbits another waypoint, this will be the symbol of the
+ *                        waypoint that it orbits. Otherwise this will be `null`.
+ *                      symbol
+ *                        The symbol of the waypoint.
+ *                      traits
+ *                        An array of waypoint trait objects, each of which have these keys:
+ *                          symbol
+ *                            The trait symbol.
+ *                          name
+ *                            The name of the trait.
+ *                          description
+ *                            The description of the trait.
+ *                      type_id
+ *                        The database id of the type of this waypoint.
+ *                      type_symbol
+ *                        The symbol of the waypoint type.
+ *          error_message
+ *            Present if `success == false`. A string describing what went wrong.
+ */
 async function get_system_waypoints_internal(
-  auth_token, system_symbol, system_id, waypoint_data_loaded, {already_within_transaction} = {}
+  auth_token, system, waypoint_data_loaded, {already_within_transaction} = {}
 ) {
   if (!waypoint_data_loaded) {
     const result = await load_system_data(
-      auth_token, system_symbol, system_id, m_api.e_priority.normal, {already_within_transaction}
+      auth_token, system.symbol, system.id, m_api.e_priority.normal, {already_within_transaction}
     );
     if (!result.success) {
       return result;
@@ -717,7 +766,7 @@ async function get_system_waypoints_internal(
         INNER JOIN waypoint_type ON waypoint_type.id = waypoint.type_id
         WHERE waypoint.system_id = $system_id;
       `,
-      {$system_id: system_id}
+      {$system_id: system.id}
     );
     const waypoint_map = {};
     for (const waypoint of waypoints) {
@@ -749,6 +798,6 @@ async function get_system_waypoints_internal(
 
       waypoint_map[waypoint.symbol] = waypoint;
     }
-    return {success: true, result: waypoint_map};
+    return {success: true, result: {system, waypoints: waypoint_map}};
   }, {with_transaction: true, already_within_transaction});
 }
