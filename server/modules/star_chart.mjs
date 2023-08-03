@@ -53,10 +53,12 @@
  *                The database id of the system.
  *              symbol
  *                The symbol representing the system.
- *              x
- *                The x coordinate of the system.
- *              y
- *                The y coordinate of the system.
+ *              position
+ *                An object describing the position of the system. Will contain these keys:
+ *                  x
+ *                    The x coordinate of the system.
+ *                  y
+ *                    The y coordinate of the system.
  *          waypoints
  *            An object containing one entry per waypoint. For each, the key will be the waypoint
  *            symbol and the value will be an object with these keys:
@@ -107,10 +109,12 @@
  *                The database id of the system.
  *              symbol
  *                The symbol representing the system.
- *              x
- *                The x coordinate of the system.
- *              y
- *                The y coordinate of the system.
+ *              position
+ *                An object describing the position of the system. Will contain these keys:
+ *                  x
+ *                    The x coordinate of the system.
+ *                  y
+ *                    The y coordinate of the system.
  *          waypoints
  *            An object containing one entry per waypoint. For each, the key will be the waypoint
  *            symbol and the value will be an object with these keys:

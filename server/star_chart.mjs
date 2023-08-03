@@ -716,10 +716,12 @@ export async function get_system_waypoints(
  *                        The database id of the system.
  *                      symbol
  *                        The symbol representing the system.
- *                      x
- *                        The x coordinate of the system.
- *                      y
- *                        The y coordinate of the system.
+ *                      position
+ *                        An object with these properties:
+ *                          x
+ *                            The x coordinate of the system.
+ *                          y
+ *                            The y coordinate of the system.
  *                  waypoints
  *                    An object containing one entry per waypoint. For each, the key will be the
  *                    waypoint symbol and the value will be an object with these keys:
@@ -748,6 +750,13 @@ export async function get_system_waypoints(
 async function get_system_waypoints_internal(
   auth_token, system, waypoint_data_loaded, {already_within_transaction} = {}
 ) {
+  system.position = {
+    x: system.x,
+    y: system.y,
+  };
+  delete system.x;
+  delete system.y;
+
   if (!waypoint_data_loaded) {
     const result = await load_system_data(
       auth_token, system.symbol, system.id, m_api.e_priority.normal, {already_within_transaction}
