@@ -95,17 +95,17 @@ export async function init() {
   return Promise.allSettled(init_promises);
 }
 
-async function init_page(page) {
+async function init_page(page, reinit = false) {
   const page_el = document.getElementById(k_page_el_id[page]);
-  const args = [page_el];
+  const args = {page_el, reinit};
   let progress_el;
   if (k_page_init_fn[page].progress) {
     progress_el = m_progress.create({padding: "0.1rem"});
     const button = document.getElementById(k_page_button_id[page]);
     button.append(progress_el);
-    args.push(progress_el);
+    args.progress_el = progress_el;
   }
-  await k_page_init_fn[page].fn(...args);
+  await k_page_init_fn[page].fn(args);
   if (progress_el) {
     progress_el.remove();
   }
@@ -125,7 +125,7 @@ async function init_page(page) {
         show_page(e_page.settings);
       }
 
-      await init_page(page);
+      await init_page(page, true);
     };
     m_server_events.add_listener(
       m_server_events.e_event_type.server_reset,

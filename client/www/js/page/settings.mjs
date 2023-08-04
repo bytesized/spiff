@@ -22,7 +22,7 @@ const k_server_reset_behavior = Object.freeze({
   [m_agent_shared.e_server_reset_behavior.recreate]: "Attempt to Re-Create Agents",
 });
 
-export async function init(page_el) {
+export async function init({page_el}) {
   await m_agent.init();
 
   m_text_button_box.connect_handler("add_agent_tbb", add_agent);

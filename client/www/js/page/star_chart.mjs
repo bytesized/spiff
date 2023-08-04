@@ -15,7 +15,7 @@ async function show_chart_loading_error(progress_el, message) {
   });
 }
 
-export async function init(page_el, progress_el) {
+export async function init({page_el, progress_el, reinit}) {
   let progress_updated = false;
   let end_promise_fn;
   const promise_loading_complete = new Promise(resolve => {
@@ -52,6 +52,7 @@ export async function init(page_el, progress_el) {
         m_server_events.e_event_type.star_chart_load_progress,
         progress_listener
       );
+
       resolve();
     };
   });
