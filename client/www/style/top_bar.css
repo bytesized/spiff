@@ -1,11 +1,5 @@
 :root {
-  --top_bar_height: 4rem;
-  --top_bar_padding_top: 0.4rem;
-  --top_bar_padding_bottom: 0.4rem;
-  --top_bar_padding_left: 0.4rem;
-  --top_bar_padding_right: 0.4rem;
-  --top_bar_border_top: 0rem;
-  --top_bar_border_bottom: 0rem;
+  --top_bar_height: 4.4rem;
   --top_bar_margin_top: 0rem;
   --top_bar_margin_bottom: 0rem;
 }
@@ -14,14 +8,11 @@
   flex: 0 var(--top_bar_height);
   height: var(--top_bar_height);
   background-color: var(--accent_color);
-  padding-top: var(--top_bar_padding_top);
-  padding-bottom: var(--top_bar_padding_bottom);
-  padding-left: var(--top_bar_padding_left);
-  padding-right: var(--top_bar_padding_right);
-  border-top-width: var(--top_bar_border_top);
-  border-bottom-width: var(--top_bar_border_bottom);
+  padding: 0.4rem;
   margin-top: var(--top_bar_margin_top);
   margin-bottom: var(--top_bar_margin_bottom);
+
+  box-sizing: border-box;
 
   display: flex;
   flex-direction: row;
