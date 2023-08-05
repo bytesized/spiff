@@ -18,11 +18,6 @@ body {
   min-height: 100vh;
 }
 
-body > div {
-  width: 100%;
-  height: 100%;
-}
-
 input {
   background-color: var(--background_color);
   color: var(--text_color);
