@@ -1,12 +1,9 @@
-:root {
-  --busy_spinner_border_width: 0.2rem;
-}
-
 .busy_spinner {
-  border: var(--busy_spinner_border_width) solid var(--subtle_accent_color);
+  border: 0.2rem solid var(--subtle_accent_color);
   border-top-color: var(--accent_color);
   border-radius: 50%;
   animation: spin 1s linear infinite;
+  box-sizing: border-box;
   /*
    * Override either the width or the height to have that determine the size of the spinner and
    * then the other dimension will be taken care of by `aspect-ratio`.
@@ -22,7 +19,15 @@
 }
 
 .busy_spinner.medium_size {
-  height: 5rem;
+  max-height: 5rem;
+}
+
+.busy_spinner.large_size {
+  max-height: 10rem;
+}
+
+.busy_spinner.x_large_size {
+  max-height: 18rem;
 }
 
 /* Because this relies on `position: absolute`, the parent needs to be a positioned element. */
@@ -42,7 +47,7 @@
 }
 
 .sub_spinner_overlay .busy_spinner {
-  width: calc(100% - 2 * var(--busy_spinner_border_width));
+  width: 100%;
   aspect-ratio: 1/1;
   margin: auto;
 }
@@ -68,6 +73,6 @@ fieldset .sub_spinner_overlay {
 @container resize-box (aspect-ratio > 1/1) {
   .sub_spinner_overlay .busy_spinner {
     width: auto;
-    height: calc(100% - 2 * var(--busy_spinner_border_width));
+    height: 100%;
   }
 }
