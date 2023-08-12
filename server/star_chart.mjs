@@ -736,6 +736,8 @@ export async function get_system_waypoints(
  *                    waypoint symbol and the value will be an object with these keys:
  *                      id
  *                        The database id of the waypoint.
+ *                      orbitals
+ *                        An array of waypoints that orbit this one.
  *                      orbits
  *                        If this waypoint orbits another waypoint, this will be the symbol of the
  *                        waypoint that it orbits. Otherwise this will be `null`.
@@ -820,8 +822,14 @@ async function get_system_waypoints_internal(
       } else {
         waypoint.orbits = null;
       }
+      waypoint.orbitals = [];
 
       waypoint_map[waypoint.symbol] = waypoint;
+    }
+    for (const waypoint of waypoints) {
+      if (waypoint.orbits) {
+        waypoint_map[waypoint.orbits].orbitals.push(waypoint.symbol);
+      }
     }
     return {success: true, result: {system, waypoints: waypoint_map}};
   }, {with_transaction: true, already_within_transaction});

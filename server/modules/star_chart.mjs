@@ -64,6 +64,8 @@
  *            symbol and the value will be an object with these keys:
  *              id
  *                The database id of the waypoint.
+ *              orbitals
+ *                An array of waypoints that orbit this one.
  *              orbits
  *                If this waypoint orbits another waypoint, this will be the symbol of the waypoint
  *                that it orbits. Otherwise this will be `null`.
@@ -120,6 +122,8 @@
  *            symbol and the value will be an object with these keys:
  *              id
  *                The database id of the waypoint.
+ *              orbitals
+ *                An array of waypoints that orbit this one.
  *              orbits
  *                If this waypoint orbits another waypoint, this will be the symbol of the waypoint
  *                that it orbits. Otherwise this will be `null`.
