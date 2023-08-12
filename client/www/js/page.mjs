@@ -1,10 +1,13 @@
 import * as m_agent from "./agent.mjs";
 import * as m_agent_page from "./page/agent.mjs";
+import * as m_log from "./log.mjs";
 import * as m_progress from "./progress.mjs";
 import * as m_server_events from "./server_events.mjs";
 import * as m_settings_page from "./page/settings.mjs";
 import * as m_star_chart_page from "./page/star_chart.mjs";
 import * as m_storage from "./storage.mjs";
+
+const k_log = new m_log.Logger(m_log.e_log_level.warn, "page");
 
 const k_page_class = "page";
 const k_active_page_class = "active_page";
@@ -92,7 +95,12 @@ export async function init() {
     g_page_module_init_done = true;
   })());
 
-  return Promise.allSettled(init_promises);
+  const init_results = await Promise.allSettled(init_promises);
+  for (const init_result of init_results) {
+    if (init_result.status == "rejected") {
+      k_log.error("Page init error:", init_result.reason);
+    }
+  }
 }
 
 async function init_page(page, reinit = false) {
