@@ -9,7 +9,7 @@ import * as m_log from "./server/log.mjs";
 import * as m_server from "./server/index.mjs";
 import * as m_server_events from "./server/server_events.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.info, "app");
+const k_log = new m_log.Logger(m_log.e_log_level.info, "app");
 
 const args = minimist(process.argv.slice(2));
 

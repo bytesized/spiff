@@ -4,7 +4,7 @@ import * as m_server from "./server.mjs";
 import * as m_server_events from "./server_events.mjs";
 import * as m_storage from "./storage.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.warn, "agent");
+const k_log = new m_log.Logger(m_log.e_log_level.warn, "agent");
 
 const k_agent_data_version = 1;
 const k_storage_description = {

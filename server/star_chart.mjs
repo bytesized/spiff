@@ -5,7 +5,7 @@ import * as m_log from "./log.mjs";
 import * as m_server_events from "./server_events.mjs";
 import * as m_server_reset from "./server_reset.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.info, "server/star_chart");
+const k_log = new m_log.Logger(m_log.e_log_level.info, "server/star_chart");
 
 const k_star_chart_db_current_version = 1;
 

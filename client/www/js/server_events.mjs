@@ -2,7 +2,7 @@ import * as m_log from "./log.mjs";
 import * as m_server_events_shared from "./shared/server_events.mjs";
 import * as m_socket_io from "/socket.io/socket.io.esm.min.js";
 
-const k_log = new m_log.logger(m_log.e_log_level.info, "server_events");
+const k_log = new m_log.Logger(m_log.e_log_level.info, "server_events");
 
 export const e_event_type = m_server_events_shared.e_event_type;
 

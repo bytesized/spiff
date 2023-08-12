@@ -4,7 +4,7 @@ import * as m_log from "./log.mjs";
 import * as m_server_reset from "./server_reset.mjs";
 import * as m_star_chart from "./star_chart.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.warn, "server");
+const k_log = new m_log.Logger(m_log.e_log_level.warn, "server");
 
 const modules = {
   agent: await import("./modules/agent.mjs"),

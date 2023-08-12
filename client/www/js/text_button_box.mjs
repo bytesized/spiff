@@ -1,7 +1,7 @@
 import * as m_busy_spinner from "./busy_spinner.mjs";
 import * as m_log from "./log.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.debug, "text_button_box");
+const k_log = new m_log.Logger(m_log.e_log_level.debug, "text_button_box");
 
 const k_box_class = "text_button_box";
 const k_box_selector = `.${k_box_class}`;

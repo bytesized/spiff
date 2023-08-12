@@ -1,7 +1,7 @@
 import * as m_log from "./log.mjs";
 import * as m_request_shared from "./shared/request.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.warn, "server");
+const k_log = new m_log.Logger(m_log.e_log_level.warn, "server");
 
 async function dispatch(path, body = null) {
   const options = {

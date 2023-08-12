@@ -6,7 +6,7 @@ export const e_log_level = Object.freeze({
   none: 5,
 });
 
-export class logger {
+export class Logger {
   constructor(log_level, prefix) {
     this.log_level = log_level;
     this.prefix = prefix + ": ";

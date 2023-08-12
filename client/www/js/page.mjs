@@ -73,7 +73,7 @@ export async function init() {
   init_promises.push((async () => {
     await m_agent.init();
 
-    m_agent.agents.add_change_listener(new m_storage.change_listener({
+    m_agent.agents.add_change_listener(new m_storage.ChangeListener({
       selected_only: true,
       properties: ["id"],
       callback: event => {

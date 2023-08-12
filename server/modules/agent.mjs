@@ -105,7 +105,7 @@ import * as m_agent from "../agent.mjs";
 import * as m_log from "../log.mjs";
 import * as m_utils from "../utils.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.info, "server/modules/agent");
+const k_log = new m_log.Logger(m_log.e_log_level.info, "server/modules/agent");
 
 const k_add_agent_command = "add";
 const k_get_all_command = "get_all";

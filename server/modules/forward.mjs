@@ -28,7 +28,7 @@ import * as m_api_request from "../api_request.mjs";
 import * as m_log from "../log.mjs";
 import * as m_utils from "../utils.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.warn, "server/modules/forward");
+const k_log = new m_log.Logger(m_log.e_log_level.warn, "server/modules/forward");
 
 export async function handle(url, path_parts, request, request_body, response) {
   if (path_parts.length > 0) {

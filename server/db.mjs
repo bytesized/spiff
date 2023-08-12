@@ -4,7 +4,7 @@ import * as m_path from "path";
 import * as m_sqlite from "sqlite";
 import m_sqlite3 from "sqlite3";
 
-const k_log = new m_log.logger(m_log.e_log_level.warn, "server/db");
+const k_log = new m_log.Logger(m_log.e_log_level.warn, "server/db");
 
 // These are ignored if the `--dbpath` argument is used.
 const db_dirname = "spiff";

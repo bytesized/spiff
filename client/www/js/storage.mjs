@@ -1,7 +1,7 @@
 import * as m_log from "./log.mjs";
 import * as m_popup from "./popup.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.warn, "storage");
+const k_log = new m_log.Logger(m_log.e_log_level.warn, "storage");
 
 export const e_data_type = Object.freeze({
   string: "e_data_type::string",
@@ -272,9 +272,9 @@ function setup_database(event) {
  *            On success, the entry will be updated with they key that received upon inserting
  *            (which should only result in a change to the entry if the store uses `autoIncrement`)
  *          add_change_listener(listener)
- *            Takes an instance of `change_listener` as an argument.
+ *            Takes an instance of `ChangeListener` as an argument.
  *            This specifies what sorts of data changes should cause the callback to be invoked and
- *            also provides the callback itself. See the `change_listener` definition and
+ *            also provides the callback itself. See the `ChangeListener` definition and
  *            constructor for details.
  *            When the callback is invoked, it will be passed an object describing the change that
  *            has occurred. The object will have these properties:
@@ -322,7 +322,7 @@ function setup_database(event) {
  *            Returns an asynchronous iterator suitable for being used in a `for await...of`
  *            statement. Each of the iter values will be an `entry_copy`.
  *          remove_change_listener(listener)
- *            Takes a `change_listener` that was previously passed to `add_change_listener` and
+ *            Takes a `ChangeListener` that was previously passed to `add_change_listener` and
  *            removes it as a listener so that it will no longer be called on any data changes
  *            (unless it is passed to `add_change_listener` again).
  *            This only removes the listener once.
@@ -411,12 +411,12 @@ export async function create(store_name, store_version, description) {
   await until_complete(transaction);
   k_log.debug("create - store version information written");
 
-  const private_store = new store_object(store_name, description);
+  const private_store = new StoreObject(store_name, description);
   if (!description.split_public || description.split_public.length < 1) {
     return private_store;
   }
 
-  const public_store = new public_store_object(private_store);
+  const public_store = new PublicStoreObject(private_store);
   return [private_store, public_store];
 }
 
@@ -430,7 +430,7 @@ export async function create(store_name, store_version, description) {
  * than `e_change_type.property_changed` because removing the selected entry results in the
  * selection changing.
  */
-export class change_listener {
+export class ChangeListener {
   constructor(init_values = undefined) {
     // If `true`, we only care about the selected entry. If `false`, we care about any entry.
     // Note that a selection change event can only be witnessed if `selected_only == true`.
@@ -450,7 +450,7 @@ export class change_listener {
     // The callback itself. See the documentation for the return value of `create` for a
     // description of the argument passed to the callback.
     this.callback = null;
-    // This is typically not set by the constructor, but by a `public_store_object` to indicate
+    // This is typically not set by the constructor, but by a `PublicStoreObject` to indicate
     // that the listener's access is limited.
     this.public_context = false;
 
@@ -474,7 +474,7 @@ function deep_freeze(object) {
 /**
  * Documentation for this class's interface is in the return value documentation for `create`.
  */
-class store_object {
+class StoreObject {
   #store_name;
   #description;
   #listeners;
@@ -495,7 +495,7 @@ class store_object {
     this.#description = description;
     this.#listeners = [];
     this.#session_store = {};
-    this.#use_database = store_object.#need_database(description);
+    this.#use_database = StoreObject.#need_database(description);
     this.#session_selection_store = {};
     this.#next_id = 1;
 
@@ -1383,7 +1383,7 @@ class store_object {
   }
 }
 
-class public_store_object {
+class PublicStoreObject {
   #store;
 
   constructor(store) {
@@ -1453,7 +1453,7 @@ export function sync_el_text_with_selection_property(store, unset_message, ids_b
       }
     }
   };
-  const listener = new change_listener({
+  const listener = new ChangeListener({
     selected_only: true,
     properties: Object.keys(ids_by_property),
     callback

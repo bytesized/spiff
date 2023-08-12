@@ -191,7 +191,7 @@ import * as m_log from "../log.mjs";
 import * as m_star_chart from "../star_chart.mjs";
 import * as m_utils from "../utils.mjs";
 
-const k_log = new m_log.logger(m_log.e_log_level.warn, "server/modules/star_chart");
+const k_log = new m_log.Logger(m_log.e_log_level.warn, "server/modules/star_chart");
 
 const k_status_command = "status";
 const k_waypoints_command = "waypoints";

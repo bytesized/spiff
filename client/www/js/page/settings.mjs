@@ -28,7 +28,7 @@ export async function init({page_el}) {
   m_text_button_box.connect_handler("add_agent_tbb", add_agent);
   m_text_button_box.connect_handler("create_agent_tbb", create_agent);
 
-  m_agent.agents.add_change_listener(new m_storage.change_listener({
+  m_agent.agents.add_change_listener(new m_storage.ChangeListener({
     add: true,
     callback: event => {
       if (list_length() == 0) {
@@ -44,7 +44,7 @@ export async function init({page_el}) {
     },
   }));
 
-  m_agent.agents.add_change_listener(new m_storage.change_listener({
+  m_agent.agents.add_change_listener(new m_storage.ChangeListener({
     properties: ["call_sign"],
     callback: event => {
       const list_el = document.getElementById(k_agent_list_id);
@@ -53,7 +53,7 @@ export async function init({page_el}) {
     },
   }));
 
-  m_agent.agents.add_change_listener(new m_storage.change_listener({
+  m_agent.agents.add_change_listener(new m_storage.ChangeListener({
     remove: true,
     callback: event => {
       if (event.type == m_storage.e_change_type.entries_cleared || list_length() <= 1) {
@@ -64,7 +64,7 @@ export async function init({page_el}) {
     },
   }));
 
-  m_agent.agents.add_change_listener(new m_storage.change_listener({
+  m_agent.agents.add_change_listener(new m_storage.ChangeListener({
     selected_only: true,
     properties: ["id"],
     callback: event => {
