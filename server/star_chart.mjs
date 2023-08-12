@@ -249,6 +249,15 @@ async function start_chart_load(auth_token, server_reset_id) {
     throw new Error("Cannot start loading the star chart - component has shut down");
   }
 
+  if (
+    g_metadata_loaded &&
+    g_pages_loaded == g_total_pages_needed &&
+    g_system_waypoints_loaded == g_system_count
+  ) {
+    k_log.debug("No need to start star chart load - it is already loaded.");
+    return;
+  }
+
   const current_server_reset_id = m_server_reset.current_server_reset_id();
   if (server_reset_id != current_server_reset_id) {
     k_log.error(
