@@ -69,6 +69,12 @@
  *              orbits
  *                If this waypoint orbits another waypoint, this will be the symbol of the waypoint
  *                that it orbits. Otherwise this will be `null`.
+ *              position
+ *                An object describing the position of the system. Will contain these keys:
+ *                  x
+ *                    The x coordinate of the system.
+ *                  y
+ *                    The y coordinate of the system.
  *              symbol
  *                The symbol of the waypoint.
  *              traits
@@ -127,6 +133,12 @@
  *              orbits
  *                If this waypoint orbits another waypoint, this will be the symbol of the waypoint
  *                that it orbits. Otherwise this will be `null`.
+ *              position
+ *                An object describing the position of the system. Will contain these keys:
+ *                  x
+ *                    The x coordinate of the system.
+ *                  y
+ *                    The y coordinate of the system.
  *              symbol
  *                The symbol of the waypoint.
  *              traits

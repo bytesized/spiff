@@ -741,6 +741,12 @@ export async function get_system_waypoints(
  *                      orbits
  *                        If this waypoint orbits another waypoint, this will be the symbol of the
  *                        waypoint that it orbits. Otherwise this will be `null`.
+ *                      position
+ *                        An object describing the position of the system. Will contain these keys:
+ *                          x
+ *                            The x coordinate of the system.
+ *                          y
+ *                            The y coordinate of the system.
  *                      symbol
  *                        The symbol of the waypoint.
  *                      traits
@@ -781,7 +787,7 @@ async function get_system_waypoints_internal(
     const waypoints = await db.all(
       `
         SELECT waypoint.id AS id, waypoint.symbol AS symbol, waypoint.type_id AS type_id,
-               waypoint_type.symbol AS type_symbol
+               waypoint_type.symbol AS type_symbol, waypoint.x AS x, waypoint.y AS y
         FROM waypoint
         INNER JOIN waypoint_type ON waypoint_type.id = waypoint.type_id
         WHERE waypoint.system_id = $system_id;
@@ -796,6 +802,12 @@ async function get_system_waypoints_internal(
       };
       delete waypoint.type_id;
       delete waypoint.type_symbol;
+      waypoint.position = {
+        x: waypoint.x,
+        y: waypoint.y,
+      };
+      delete waypoint.x;
+      delete waypoint.y;
 
       waypoint.traits = await db.all(
         `
