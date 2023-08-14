@@ -43,7 +43,7 @@
   display: flex;
   border-width: 0;
   container-type: size;
-  container-name: resize-box;
+  container-name: subspinner-overlay-resize-box;
 }
 
 .sub_spinner_overlay .busy_spinner {
@@ -70,7 +70,7 @@ fieldset .sub_spinner_overlay {
  * This allows the spinner to occupy as much space as possible while retaining the correct aspect
  * ratio.
  */
-@container resize-box (aspect-ratio > 1/1) {
+@container subspinner-overlay-resize-box (aspect-ratio > 1/1) {
   .sub_spinner_overlay .busy_spinner {
     width: auto;
     height: 100%;
