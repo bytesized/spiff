@@ -103,4 +103,8 @@ export const star_chart = Object.freeze({
   async local_systems(min_x, max_x, min_y, max_y) {
     return dispatch("star_chart/local_systems", {min_x, max_x, min_y, max_y});
   },
+
+  async universe_bounds() {
+    return dispatch("star_chart/universe_bounds");
+  },
 });

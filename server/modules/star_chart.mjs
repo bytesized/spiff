@@ -202,6 +202,30 @@
  *                The y coordinate of the system.
  *      error_message
  *        Present if `success == false`. A string error message indicating why the request failed.
+ *
+ *  server/star_chart/universe_bounds
+ *    Gets the boundaries of the occupied universe, that is to say, the coordinates past which
+ *    there aren't any more systems. This probably should not be used until all systems have been
+ *    loaded (`server/star_chart/status` returns
+ *    `initialized && total_pages_needed == pages_loaded`).
+ *
+ *    Parameters:
+ *      None
+ *    Return Format:
+ *      success
+ *        Boolean indicating whether or not the request succeeded.
+ *      result
+ *        Present if `success == true`. Will be an object containing these keys:
+ *          min_x
+ *            The smallest x coordinate of any system.
+ *          max_x
+ *            The largest x coordinate of any system.
+ *          min_y
+ *            The smallest y coordinate of any system.
+ *          max_y
+ *            The largest y coordinate of any system.
+ *      error_message
+ *        Present if `success == false`. A string error message indicating why the request failed.
  */
 import * as m_log from "../log.mjs";
 import * as m_star_chart from "../star_chart.mjs";
@@ -213,6 +237,7 @@ const k_status_command = "status";
 const k_waypoints_command = "waypoints";
 const k_sibling_waypoints_command = "sibling_waypoints";
 const k_local_systems_command = "local_systems";
+const k_universe_bounds_command = "universe_bounds";
 
 export async function handle(url, path_parts, request, request_body, response) {
   if (path_parts.length < 1) {
@@ -246,6 +271,10 @@ export async function handle(url, path_parts, request, request_body, response) {
     const response_object = await m_star_chart.get_local_systems(
       request_body.min_x, request_body.max_x, request_body.min_y, request_body.max_y
     );
+    m_utils.respond_success(k_log, response, response_object);
+    return;
+  } else if (command == k_universe_bounds_command) {
+    const response_object = await m_star_chart.get_universe_bounds();
     m_utils.respond_success(k_log, response, response_object);
     return;
   }

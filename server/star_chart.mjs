@@ -888,3 +888,18 @@ export async function get_local_systems(
     return {success: true, result: system_map};
   }, {already_within_transaction})
 }
+
+export async function get_universe_bounds({already_within_transaction = false} = {}) {
+  return m_db.enqueue(async db => {
+    const response = {success: true, result: {}};
+    let result = await db.get("SELECT MIN(x) AS min_x FROM system;");
+    response.result.min_x = result.min_x;
+    result = await db.get("SELECT MAX(x) AS max_x FROM system;");
+    response.result.max_x = result.max_x;
+    result = await db.get("SELECT MIN(y) AS min_y FROM system;");
+    response.result.min_y = result.min_y;
+    result = await db.get("SELECT MAX(y) AS max_y FROM system;");
+    response.result.max_y = result.max_y;
+    return response;
+  }, {with_transaction: true, already_within_transaction});
+}
