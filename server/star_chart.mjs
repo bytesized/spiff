@@ -149,11 +149,13 @@ export async function init(args) {
 
   m_server_reset.add_reset_complete_listener(async server_reset => reset());
 
-  m_agent.add_change_agent_selection_listener(async (agent, {already_within_transaction}) => {
-    if (agent.id != null && !g_chart_load_promise) {
-      await start_chart_load(agent.auth_token, agent.server_reset_id);
+  m_agent.add_change_agent_selection_listener(
+    async (agent, {already_within_transaction = false}) => {
+      if (agent.id != null && !g_chart_load_promise) {
+        await start_chart_load(agent.auth_token, agent.server_reset_id);
+      }
     }
-  });
+  );
 }
 
 export async function shutdown() {
@@ -500,7 +502,7 @@ export function status() {
 }
 
 async function load_system_data(
-  auth_token, system_symbol, system_id, priority, {already_within_transaction} = {}
+  auth_token, system_symbol, system_id, priority, {already_within_transaction = false} = {}
 ) {
   const waypoints = [];
   let page = 1;
@@ -618,7 +620,7 @@ async function load_system_data(
 }
 
 export async function get_sibling_waypoints(
-  auth_token, waypoint_symbol, {already_within_transaction} = {}
+  auth_token, waypoint_symbol, {already_within_transaction = false} = {}
 ) {
   let system;
   let waypoint_data_loaded;
@@ -664,7 +666,7 @@ export async function get_sibling_waypoints(
 }
 
 export async function get_system_waypoints(
-  auth_token, system_symbol, {already_within_transaction} = {}
+  auth_token, system_symbol, {already_within_transaction = false} = {}
 ) {
   let system;
   let waypoint_data_loaded;
@@ -765,7 +767,7 @@ export async function get_system_waypoints(
  *            Present if `success == false`. A string describing what went wrong.
  */
 async function get_system_waypoints_internal(
-  auth_token, system, waypoint_data_loaded, {already_within_transaction} = {}
+  auth_token, system, waypoint_data_loaded, {already_within_transaction = false} = {}
 ) {
   system.position = {
     x: system.x,
@@ -848,7 +850,7 @@ async function get_system_waypoints_internal(
 }
 
 export async function get_local_systems(
-  min_x, max_x, min_y, max_y, {already_within_transaction} = {}
+  min_x, max_x, min_y, max_y, {already_within_transaction = false} = {}
 ) {
   return m_db.enqueue(async db => {
     const systems = await db.all(
