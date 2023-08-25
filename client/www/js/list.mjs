@@ -6,7 +6,7 @@ const k_content_class = "content";
 const k_spacer_class = "spacer";
 const k_trash_button_class = "trash";
 const k_selected_item_class = "selected";
-const k_item_id_attribute = "list_id";
+const k_item_id_attribute = "data-list_id";
 
 /**
  * @param items

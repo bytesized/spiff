@@ -7,7 +7,7 @@ const k_radio_item_container_class = "radio_item";
 const k_radio_group_name_prefix = "radio_group_";
 const k_radio_input_id_prefix = "radio_input_";
 
-const k_radio_input_id_attribute = "radio_id";
+const k_radio_input_id_attribute = "data-radio_id";
 
 const k_currently_selected = {};
 

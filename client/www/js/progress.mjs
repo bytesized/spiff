@@ -1,10 +1,10 @@
 const k_progress_container_class = "progress_container";
-const k_full_bar_color_attr = "full_bar_color";
-const k_empty_bar_color_attr = "empty_bar_color";
-const k_error_background_color_attr = "error_background_color";
-const k_error_foreground_color_attr = "error_foreground_color";
-const k_bar_width_attr = "bar_width";
-const k_canvas_size_attr = "canvas_size";
+const k_full_bar_color_attr = "data-full_bar_color";
+const k_empty_bar_color_attr = "data-empty_bar_color";
+const k_error_background_color_attr = "data-error_background_color";
+const k_error_foreground_color_attr = "data-error_foreground_color";
+const k_bar_width_attr = "data-bar_width";
+const k_canvas_size_attr = "data-canvas_size";
 
 /**
  * @returns
