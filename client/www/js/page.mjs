@@ -36,6 +36,9 @@ const k_page_init_fn = Object.freeze({
   [e_page.star_chart]: {fn: m_star_chart_page.init, progress: true, reinit_on_server_reset: true},
 });
 
+const k_page_on_activate_fn = Object.freeze({
+});
+
 const k_page_disabled_if_no_agent_selected = Object.freeze({
   [e_page.agent]: true,
   [e_page.star_chart]: true,
@@ -187,4 +190,7 @@ function show_page(page) {
   }
   let page_el = document.getElementById(k_page_el_id[page]);
   page_el.classList.add(k_active_page_class);
+  if (k_page_on_activate_fn[page]) {
+    k_page_on_activate_fn[page]();
+  }
 }
