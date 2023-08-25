@@ -23,12 +23,12 @@ const e_page = Object.freeze({
 
 const k_pages = Object.values(e_page);
 
-const k_page_button_id = {
+const k_page_button_id = Object.freeze({
   [e_page.agent]: "agent_icon",
   [e_page.star_chart]: "star_chart_icon",
   [e_page.ships]: "ship_icon",
   [e_page.settings]: "settings_icon",
-};
+});
 
 const k_page_init_fn = Object.freeze({
   [e_page.settings]: {fn: m_settings_page.init},
@@ -37,6 +37,9 @@ const k_page_init_fn = Object.freeze({
 });
 
 const k_page_on_activate_fn = Object.freeze({
+});
+
+const k_page_on_deactivate_fn = Object.freeze({
 });
 
 const k_page_disabled_if_no_agent_selected = Object.freeze({
@@ -56,6 +59,7 @@ const k_page_el_id = Object.freeze({
 const g_button_listener = {};
 const g_inited_pages = new Set();
 let g_page_module_init_done = false;
+let g_active_page = e_page.settings;
 
 export async function init() {
   let init_promises = [];
@@ -185,11 +189,13 @@ function disable_button(page) {
 }
 
 function show_page(page) {
-  for (const active_page of document.querySelectorAll(k_active_page_selector)) {
-    active_page.classList.remove(k_active_page_class);
+  const old_page_el = document.getElementById(k_page_el_id[g_active_page]);
+  old_page_el.classList.remove(k_active_page_class);
+  if (k_page_on_deactivate_fn[page]) {
+    k_page_on_deactivate_fn[page]();
   }
-  let page_el = document.getElementById(k_page_el_id[page]);
-  page_el.classList.add(k_active_page_class);
+  const new_page_el = document.getElementById(k_page_el_id[page]);
+  new_page_el.classList.add(k_active_page_class);
   if (k_page_on_activate_fn[page]) {
     k_page_on_activate_fn[page]();
   }
