@@ -191,12 +191,13 @@ function disable_button(page) {
 function show_page(page) {
   const old_page_el = document.getElementById(k_page_el_id[g_active_page]);
   old_page_el.classList.remove(k_active_page_class);
-  if (k_page_on_deactivate_fn[page]) {
-    k_page_on_deactivate_fn[page]();
+  if (k_page_on_deactivate_fn[g_active_page]) {
+    k_page_on_deactivate_fn[g_active_page]();
   }
   const new_page_el = document.getElementById(k_page_el_id[page]);
   new_page_el.classList.add(k_active_page_class);
   if (k_page_on_activate_fn[page]) {
     k_page_on_activate_fn[page]();
   }
+  g_active_page = page;
 }
