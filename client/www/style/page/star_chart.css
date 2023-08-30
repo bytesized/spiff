@@ -1,0 +1,9 @@
+#star_chart_page {
+  height: calc(
+    100vh - (var(--top_bar_height) + var(--top_bar_margin_top) + var(--top_bar_margin_top))
+  );
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}

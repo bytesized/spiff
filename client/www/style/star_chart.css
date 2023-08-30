@@ -1,0 +1,78 @@
+.star_chart {
+  margin: 0;
+  border-width: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+
+  container-type: size;
+  container-name: subspinner-overlay-resize-box;
+}
+
+.star_chart .location {
+  position: absolute;
+  border-radius: 50%;
+  border-style: solid;
+  border-color: transparent;
+}
+
+.star_chart .location.orbited {
+  border-color: white;
+  border-width: 0.2rem;
+}
+
+.star_chart .location.clickable {
+  cursor: pointer;
+}
+
+.star_chart .overflow_indicator {
+  --star_chart_overflow_indicator_size: 0.5rem;
+  --star_chart_overflow_indicator_spacing: 0.5rem;
+  --star_chart_overflow_indicator_color: #B0B0B0;
+
+  position: absolute;
+
+  /*
+   * These are going to use the CSS triangle trick of having a 0 sized object with a single visible
+   * border.
+   */
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-color: transparent;
+  border-width: var(--star_chart_overflow_indicator_size);
+}
+
+.star_chart .overflow_indicator.top {
+  top: var(--star_chart_overflow_indicator_spacing);
+  left: calc(50% - var(--star_chart_overflow_indicator_size));
+
+  border-top-width: 0;
+  border-bottom-color: var(--star_chart_overflow_indicator_color);
+}
+
+.star_chart .overflow_indicator.bottom {
+  bottom: var(--star_chart_overflow_indicator_spacing);
+  left: calc(50% - var(--star_chart_overflow_indicator_size));
+
+  border-bottom-width: 0;
+  border-top-color: var(--star_chart_overflow_indicator_color);
+}
+
+.star_chart .overflow_indicator.left {
+  left: var(--star_chart_overflow_indicator_spacing);
+  top: calc(50% - var(--star_chart_overflow_indicator_size));
+
+  border-left-width: 0;
+  border-right-color: var(--star_chart_overflow_indicator_color);
+}
+
+.star_chart .overflow_indicator.right {
+  right: var(--star_chart_overflow_indicator_spacing);
+  top: calc(50% - var(--star_chart_overflow_indicator_size));
+
+  border-right-width: 0;
+  border-left-color: var(--star_chart_overflow_indicator_color);
+}

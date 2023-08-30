@@ -37,9 +37,11 @@ const k_page_init_fn = Object.freeze({
 });
 
 const k_page_on_activate_fn = Object.freeze({
+  [e_page.star_chart]: m_star_chart_page.on_page_activate,
 });
 
 const k_page_on_deactivate_fn = Object.freeze({
+  [e_page.star_chart]: m_star_chart_page.on_page_deactivate,
 });
 
 const k_page_disabled_if_no_agent_selected = Object.freeze({
