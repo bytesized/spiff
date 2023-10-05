@@ -229,10 +229,12 @@ export class StarChart {
       const render_options = {zoom_by: event.wheelDeltaY};
       const bound_box = this.#chart_el.getBoundingClientRect();
       if (this.#mouse_x != null) {
-        render_options.zoom_at_x = this.#mouse_x / bound_box.width;
+        render_options.zoom_center_x = (this.#mouse_x - bound_box.x) / bound_box.width;
       }
+      // We need to invert this value because `MouseEvent.clientY` is the distance from the top
+      // whereas the map Y coordinates measure from the bottom.
       if (this.#mouse_y != null) {
-        render_options.zoom_at_y = this.#mouse_y / bound_box.height;
+        render_options.zoom_center_y = 1 - ((this.#mouse_y - bound_box.y) / bound_box.height);
       }
       this.#system_chart_rerender(e_rerender_reason.zoom, render_options);
     });
@@ -550,8 +552,8 @@ export class StarChart {
     // TODO: Render back button
 
     this.#resize_observer = new ResizeObserver(entries => {
-      this.mouse_x = null;
-      this.mouse_y = null;
+      this.#mouse_x = null;
+      this.#mouse_y = null;
 
       this.#system_chart_rerender(e_rerender_reason.chart_resize);
     });
@@ -569,20 +571,20 @@ export class StarChart {
    *        An integer. Should be specified if `reason == e_rerender_reason.zoom`. Positive to zoom
    *        in, negative to zoom out. Magnitude indicates how much should to zoom by. This value
    *        will be that of `WheelEvent.wheelDeltaY`.
-   * @param zoom_at_x
-   *        The X position of the mouse cursor when zooming was performed. This is expressed as a
-   *        ratio of the distance from the left edge of the map to the right edge of the map. It
-   *        will therefore be a number between 0 and 100 (inclusive).
+   * @param zoom_center_x
+   *        The X position of the center point of the zoom (where we will zoom towards or away
+   *        from). This is expressed as a ratio of the distance from the left edge of the map to
+   *        the right edge of the map. It will therefore be a number between 0 and 1 (inclusive).
    *        Optionally specified if `reason == e_rerender_reason.zoom` (not used otherwise). If
    *        unspecified, it will be as if the cursor is in the center of the map.
-   * @param zoom_at_y
-   *        The Y position of the mouse cursor when zooming was performed. This is expressed as a
-   *        ratio of the distance from the top edge of the map to the bottom edge of the map. It
-   *        will therefore be a number between 0 and 100 (inclusive).
+   * @param zoom_center_y
+   *        The Y position of the center point of the zoom (where we will zoom towards or away
+   *        from). This is expressed as a ratio of the distance from the bottom edge of the map to
+   *        the top edge of the map. It will therefore be a number between 0 and 1 (inclusive).
    *        Optionally specified if `reason == e_rerender_reason.zoom` (not used otherwise). If
    *        unspecified, it will be as if the cursor is in the center of the map.
    */
-  #system_chart_rerender(reason, {zoom_by, zoom_at_x, zoom_at_y} = {}) {
+  #system_chart_rerender(reason, {zoom_by, zoom_center_x, zoom_center_y} = {}) {
     const waypoints = [];
     for (const symbol in this.#current_system.waypoints) {
       const waypoint = this.#current_system.waypoints[symbol];
@@ -686,29 +688,18 @@ export class StarChart {
       const adjustment_x = new_x_span - x_span;
       const adjustment_y = new_y_span - y_span;
 
-      // If we don't have a coordinate, zoom from the center. If we have a coordinate near the
-      // edge, zoom from the exact edge so that we don't lose waypoints near the edge.
-      if (zoom_at_x == undefined) {
-        zoom_at_x = 0.5;
-      } else if (zoom_at_x < 0.2) {
-        zoom_at_x = 0;
-      } else if (zoom_at_x > 0.8) {
-        zoom_at_x = 1;
+      // If we don't have a coordinate, zoom from the center.
+      if (zoom_center_x == undefined) {
+        zoom_center_x = 0.5;
       }
-      if (zoom_at_y == undefined) {
-        zoom_at_y = 0.5;
-      } else if (zoom_at_y < 0.2) {
-        zoom_at_y = 0;
-      } else if (zoom_at_y > 0.8) {
-        zoom_at_y = 1;
+      if (zoom_center_y == undefined) {
+        zoom_center_y = 0.5;
       }
 
-      this.#min_x -= adjustment_x * zoom_at_x;
-      this.#max_x += adjustment_x * (1 - zoom_at_x);
-      // This seems backwards because x coordinate 0 of the map system is the bottom of the
-      // map element and x coordinate 0 of the mouse position is at the top of the map element
-      this.#min_y -= adjustment_y * (1 - zoom_at_y);
-      this.#max_y += adjustment_y * zoom_at_y;
+      this.#min_x -= adjustment_x * zoom_center_x;
+      this.#max_x += adjustment_x * (1 - zoom_center_x);
+      this.#min_y -= adjustment_y * zoom_center_y;
+      this.#max_y += adjustment_y * (1 - zoom_center_y);
 
       x_span = new_x_span;
       y_span = new_y_span;
