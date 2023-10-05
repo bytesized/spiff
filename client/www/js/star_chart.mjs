@@ -121,6 +121,12 @@ export class StarChart {
   #y_pan = e_pan_direction.none;
   #pan_interval_id = null;
 
+  // These are for tracking mouse movement (since we can't just request the mouse position, for
+  // some odd reason). They are directly assigned from `MouseEvent.clientX` and
+  // `MouseEvent.clientY`
+  #mouse_x = null;
+  #mouse_y = null;
+
   /**
    * Renders a star chart and optionally allows the user to select a target from it.
    *
@@ -209,6 +215,27 @@ export class StarChart {
 
     this.#chart_el = document.createElement("div");
     this.#chart_el.classList.add(k_star_chart_class_name);
+
+    // Apparently we can't just get the mouse position for some reason. We have to track it so it's
+    // available when we want to zoom towards where the mouse is.
+    this.#chart_el.addEventListener("mousemove", event => {
+      this.#mouse_x = event.clientX;
+      this.#mouse_y = event.clientY;
+    });
+    this.#chart_el.addEventListener("wheel", event => {
+      if (event.wheelDeltaY == 0 || !this.usable) {
+        return;
+      }
+      const render_options = {zoom_by: event.wheelDeltaY};
+      const bound_box = this.#chart_el.getBoundingClientRect();
+      if (this.#mouse_x != null) {
+        render_options.zoom_at_x = this.#mouse_x / bound_box.width;
+      }
+      if (this.#mouse_y != null) {
+        render_options.zoom_at_y = this.#mouse_y / bound_box.height;
+      }
+      this.#system_chart_rerender(e_rerender_reason.zoom, render_options);
+    });
 
     this.#location_change_queue.on_before_start(() => this.#set_loading());
     this.#location_change_queue.on_after_stop(() => this.#clear_loading());
@@ -406,12 +433,6 @@ export class StarChart {
     // Lazily define the navigation callbacks.
     if (!this.#navigation_callbacks) {
       this.#navigation_callbacks = {
-        wheel: event => {
-          if (event.wheelDeltaY == 0 || !this.usable) {
-            return;
-          }
-          this.#system_char_rerender(e_rerender_reason.zoom, {zoom_by: event.wheelDeltaY});
-        },
         keydown: event => {
           switch (event.code) {
           case "ArrowLeft":
@@ -447,10 +468,10 @@ export class StarChart {
           }
           if (this.#pan_interval_id == null) {
             this.#pan_interval_id = setInterval(
-              () => this.#system_char_rerender(e_rerender_reason.pan),
+              () => this.#system_chart_rerender(e_rerender_reason.pan),
               k_pan_interval_ms
             );
-            this.#system_char_rerender(e_rerender_reason.pan);
+            this.#system_chart_rerender(e_rerender_reason.pan);
           }
         },
         keyup: event => {
@@ -487,7 +508,7 @@ export class StarChart {
       this.#resize_observer.observe(this.#chart_el);
       // Quite possibly we would have fired this when the observer was disconnected, so fire it
       // now.
-      this.#system_char_rerender(e_rerender_reason.chart_resize);
+      this.#system_chart_rerender(e_rerender_reason.chart_resize);
     }
 
     for (const event in this.#navigation_callbacks) {
@@ -529,13 +550,16 @@ export class StarChart {
     // TODO: Render back button
 
     this.#resize_observer = new ResizeObserver(entries => {
-      this.#system_char_rerender(e_rerender_reason.chart_resize);
+      this.mouse_x = null;
+      this.mouse_y = null;
+
+      this.#system_chart_rerender(e_rerender_reason.chart_resize);
     });
     if (this.#active != e_activation.active) {
       this.#resize_observer.observe(this.#chart_el);
     }
 
-    this.#system_char_rerender(e_rerender_reason.initial_render);
+    this.#system_chart_rerender(e_rerender_reason.initial_render);
   }
 
   /**
@@ -545,8 +569,20 @@ export class StarChart {
    *        An integer. Should be specified if `reason == e_rerender_reason.zoom`. Positive to zoom
    *        in, negative to zoom out. Magnitude indicates how much should to zoom by. This value
    *        will be that of `WheelEvent.wheelDeltaY`.
+   * @param zoom_at_x
+   *        The X position of the mouse cursor when zooming was performed. This is expressed as a
+   *        ratio of the distance from the left edge of the map to the right edge of the map. It
+   *        will therefore be a number between 0 and 100 (inclusive).
+   *        Optionally specified if `reason == e_rerender_reason.zoom` (not used otherwise). If
+   *        unspecified, it will be as if the cursor is in the center of the map.
+   * @param zoom_at_y
+   *        The Y position of the mouse cursor when zooming was performed. This is expressed as a
+   *        ratio of the distance from the top edge of the map to the bottom edge of the map. It
+   *        will therefore be a number between 0 and 100 (inclusive).
+   *        Optionally specified if `reason == e_rerender_reason.zoom` (not used otherwise). If
+   *        unspecified, it will be as if the cursor is in the center of the map.
    */
-  #system_char_rerender(reason, {zoom_by} = {}) {
+  #system_chart_rerender(reason, {zoom_by, zoom_at_x, zoom_at_y} = {}) {
     const waypoints = [];
     for (const symbol in this.#current_system.waypoints) {
       const waypoint = this.#current_system.waypoints[symbol];
@@ -617,33 +653,65 @@ export class StarChart {
 
       x_span = this.#max_x - this.#min_x;
       y_span = this.#max_y - this.#min_y;
-      pixels_per_coord = Math.min(bound_box.width / x_span, bound_box.height / y_span);
-    }
 
-    if (reason == e_rerender_reason.zoom) {
+      // We want to have the same number of pixels per coordinate in both dimensions. Whichever
+      // dimension has fewer, adjust to match the other dimension.
+      const pixels_per_coord_x = bound_box.width / x_span;
+      const pixels_per_coord_y = bound_box.height / y_span;
+      if (pixels_per_coord_x < pixels_per_coord_y) {
+        // We are keeping the x axis how it is and adjusting the y axis.
+        pixels_per_coord = pixels_per_coord_x;
+        const center_y = (y_span / 2) + this.#min_y;
+        y_span = bound_box.height / pixels_per_coord;
+        const y_edge_offset = y_span / 2;
+        this.#min_y = center_y - y_edge_offset;
+        this.#max_y = center_y + y_edge_offset;
+      } else {
+        // We are keeping the y axis how it is and adjusting the x axis.
+        pixels_per_coord = pixels_per_coord_y;
+        const center_x = (x_span / 2) + this.#min_x;
+        x_span = bound_box.width / pixels_per_coord;
+        const x_edge_offset = x_span / 2;
+        this.#min_x = center_x - x_edge_offset;
+        this.#max_x = center_x + x_edge_offset;
+      }
+    } else if (reason == e_rerender_reason.zoom) {
       pixels_per_coord = Math.max(
         pixels_per_coord * (1 + (zoom_by * k_system_zoom_multiplier)),
         k_system_min_pixels_per_coord
       );
-    }
 
-    if (resize_to_fit || reason == e_rerender_reason.zoom) {
-      const center_x = (x_span / 2) + this.#min_x;
-      const center_y = (y_span / 2) + this.#min_y;
-      x_span = bound_box.width / pixels_per_coord;
-      y_span = bound_box.height / pixels_per_coord;
-      let x_edge_offset = x_span / 2;
-      let y_edge_offset = y_span / 2;
-      this.#min_x = center_x - x_edge_offset;
-      this.#max_x = center_x + x_edge_offset;
-      this.#min_y = center_y - y_edge_offset;
-      this.#max_y = center_y + y_edge_offset;
+      const new_x_span = bound_box.width / pixels_per_coord;
+      const new_y_span = bound_box.height / pixels_per_coord;
+      const adjustment_x = new_x_span - x_span;
+      const adjustment_y = new_y_span - y_span;
 
-      x_span = this.#max_x - this.#min_x;
-      y_span = this.#max_y - this.#min_y;
+      // If we don't have a coordinate, zoom from the center. If we have a coordinate near the
+      // edge, zoom from the exact edge so that we don't lose waypoints near the edge.
+      if (zoom_at_x == undefined) {
+        zoom_at_x = 0.5;
+      } else if (zoom_at_x < 0.2) {
+        zoom_at_x = 0;
+      } else if (zoom_at_x > 0.8) {
+        zoom_at_x = 1;
+      }
+      if (zoom_at_y == undefined) {
+        zoom_at_y = 0.5;
+      } else if (zoom_at_y < 0.2) {
+        zoom_at_y = 0;
+      } else if (zoom_at_y > 0.8) {
+        zoom_at_y = 1;
+      }
 
-      // Assuming that we got the aspect ratio right.
-      pixels_per_coord = bound_box.width / x_span;
+      this.#min_x -= adjustment_x * zoom_at_x;
+      this.#max_x += adjustment_x * (1 - zoom_at_x);
+      // This seems backwards because x coordinate 0 of the map system is the bottom of the
+      // map element and x coordinate 0 of the mouse position is at the top of the map element
+      this.#min_y -= adjustment_y * (1 - zoom_at_y);
+      this.#max_y += adjustment_y * zoom_at_y;
+
+      x_span = new_x_span;
+      y_span = new_y_span;
     }
 
     if (reason == e_rerender_reason.pan) {
