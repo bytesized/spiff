@@ -1,9 +1,11 @@
 import * as m_busy_spinner from "./busy_spinner.mjs";
 import * as m_fn_queue from "./fn_queue.mjs";
+import * as m_list from "./list.mjs";
 import * as m_log from "./log.mjs";
 import * as m_popup from "./popup.mjs";
 import * as m_server from "./server.mjs";
 import * as m_server_events from "./server_events.mjs";
+import * as m_utils from "./utils.mjs";
 
 const k_log = new m_log.Logger(m_log.e_log_level.warn, "star_chart");
 
@@ -48,25 +50,30 @@ const e_pan_direction = Object.freeze({
 
 const k_star_chart_class_name = "star_chart";
 const k_location_class_name = "location";
+const k_location_icon_class_name = "icon";
 const k_orbited_location_class_name = "orbited";
 const k_clickable_location_class_name = "clickable";
 const k_location_symbol_attr = "data-symbol";
-const k_location_id_prefix = "star_chart_location_";
 
-const k_overflow_indicator_class_name = "overflow_indicator";
-const k_upper_overflow_indicator_class_name = "top";
-const k_lower_overflow_indicator_class_name = "bottom";
 const k_left_overflow_indicator_class_name = "left";
+const k_lower_overflow_indicator_class_name = "bottom";
+const k_overflow_indicator_class_name = "overflow_indicator";
 const k_right_overflow_indicator_class_name = "right";
+const k_tooltip_class_name = "tooltip";
+const k_tooltip_data_list_class_name = "data_list";
+const k_tooltip_expanded_trait_class_name = "expanded";
+const k_tooltip_trait_description_class_name = "trait_description";
+const k_upper_overflow_indicator_class_name = "top";
 
-const k_system_edge_buffer_px = 25;
-const k_system_zoom_multiplier = 0.001;
-const k_system_min_pixels_per_coord = 0.01;
-const k_waypoint_image_base_size = 1;
-const k_waypoint_padding_base_width = 0.6;
-const k_waypoint_border_base_width = 0.2;
-const k_pan_interval_ms = 25;
 const k_pan_base_distance = 5;
+const k_pan_interval_ms = 25;
+const k_system_edge_buffer_px = 25;
+const k_system_min_pixels_per_coord = 0.08;
+const k_system_zoom_multiplier = 0.001;
+const k_tooltip_width_px = 400;
+const k_waypoint_border_base_width = 0.2;
+const k_waypoint_image_base_size = 20;
+const k_waypoint_padding_base_width = 3;
 
 let g_next_chart_id = 0;
 
@@ -85,14 +92,46 @@ export class StarChart {
   #close_promise;
   #navigation_callbacks = null;
 
-  // If non-`null`, matches the `result` format of the `server/star_chart/waypoints` and
+  // If non-`null`, matches the `result.waypoints` format of the `server/star_chart/waypoints` and
   // `server/star_chart/sibling_waypoints` local API endpoints. If `null`, we are viewing the
   // universe chart.
+  // Waypoints may have additional keys including:
+  //   connect_tooltip_show_listener
+  //     Connects an event listener so that the tooltip is shown on waypoint mouseover.
+  //   disconnect_tooltip_show_listener
+  //     Disconnects the event listener that shows the tooltip on waypoint mouseover.
+  //   el
+  //     Will be present if the waypoint is currently rendered. Will be the parent DOM element
+  //     containing the entire representation of the waypoint. This may be larger than the
+  //     `icon_el`. This element will define the area over which hovering will open the tooltip.
+  //   el_size
+  //     The pixel size of the of the waypoint element. Will be present if the waypoint is
+  //     currently rendered.
+  //   el_x
+  //     The pixel x position of the left edge of the waypoint element. Will be present if the
+  //     waypoint is currently rendered.
+  //   el_y
+  //     The pixel y position of the bottom edge of the waypoint element. Will be present if the
+  //     waypoint is currently rendered.
+  //   icon_el
+  //     Will be present if the icon is currently rendered. Will be the DOM element that visually
+  //     represents the waypoint.
+  //   rendered
+  //     Will be `true` if the waypoint is currently rendered. May not be present or may be `false`
+  //     if the waypoint has not been rendered.
+  //   tooltip_el
+  //     Will be present if the waypoint is currently rendered. Will be the DOM element
+  //     representing the tooltip for the waypoint
+  //   tooltip_show_fn
+  //     Will be present if the waypoint is currently rendered. Will be a function taking no
+  //     arguments that, when called, renders the waypoint's tooltip.
   #current_system = null;
   // If non-`null`, will be the symbol of a waypoint in `#current_system`. This will represent the
   // waypoint that we are viewing the orbitals of. If `null`, we are viewing the entire system or
   // the universe chat.
   #current_waypoint = null;
+  // If non-`null`, a tooltip is currently being shown for the waypoint indicated.
+  #active_tooltip_waypoint = null;
   #destroyed = false;
   #resize_observer = null;
   #selection_type;
@@ -218,13 +257,16 @@ export class StarChart {
 
     // Apparently we can't just get the mouse position for some reason. We have to track it so it's
     // available when we want to zoom towards where the mouse is.
-    this.#chart_el.addEventListener("mousemove", event => {
-      this.#mouse_x = event.clientX;
-      this.#mouse_y = event.clientY;
-    });
+    this.#chart_el.addEventListener("mousemove", this.#on_mouse_move.bind(this));
     this.#chart_el.addEventListener("wheel", event => {
       if (event.wheelDeltaY == 0 || !this.usable) {
         return;
+      }
+      if (this.#active_tooltip_waypoint) {
+        const tooltip_bound_box = this.#active_tooltip_waypoint.tooltip_el.getBoundingClientRect();
+        if (this.#bound_box_contains_mouse(tooltip_bound_box)) {
+          return;
+        }
       }
       const render_options = {zoom_by: event.wheelDeltaY};
       const bound_box = this.#chart_el.getBoundingClientRect();
@@ -260,6 +302,11 @@ export class StarChart {
     } else {
       this.#set_loading();
     }
+  }
+
+  #on_mouse_move(event) {
+    this.#mouse_x = event.clientX;
+    this.#mouse_y = event.clientY;
   }
 
   /**
@@ -593,9 +640,9 @@ export class StarChart {
       }
     }
 
-    const bound_box = this.#chart_el.getBoundingClientRect();
+    const chart_bound_box = this.#chart_el.getBoundingClientRect();
 
-    if (bound_box.width == 0 || bound_box.height == 0 || waypoints.length < 1) {
+    if (chart_bound_box.width == 0 || chart_bound_box.height == 0 || waypoints.length < 1) {
       this.#chart_el.replaceChildren();
       for (const symbol in this.#current_system.waypoints) {
         this.#current_system.waypoints[symbol].rendered = false;
@@ -627,18 +674,21 @@ export class StarChart {
     let x_span = this.#max_x - this.#min_x;
     let y_span = this.#max_y - this.#min_y;
 
-    let pixels_per_coord = Math.min(bound_box.width / x_span, bound_box.height / y_span);
+    let pixels_per_coord =
+      Math.min(chart_bound_box.width / x_span, chart_bound_box.height / y_span);
 
-    let waypoint_size;
+    let waypoint_content_size;
     let waypoint_padding_width;
     let waypoint_border_width;
+    let waypoint_total_size;
     let waypoint_total_size_halved;
     const update_waypoint_size = () => {
-      waypoint_size = k_waypoint_image_base_size * pixels_per_coord;
+      waypoint_content_size = k_waypoint_image_base_size * pixels_per_coord;
       waypoint_padding_width = k_waypoint_padding_base_width * pixels_per_coord;
       waypoint_border_width = k_waypoint_border_base_width * pixels_per_coord;
-      waypoint_total_size_halved =
-        (waypoint_size + (waypoint_padding_width * 2) + (waypoint_border_width * 2)) / 2;
+      waypoint_total_size =
+        waypoint_content_size + (waypoint_padding_width * 2) + (waypoint_border_width * 2);
+      waypoint_total_size_halved = waypoint_total_size / 2;
     };
 
     if (resize_to_fit) {
@@ -658,13 +708,13 @@ export class StarChart {
 
       // We want to have the same number of pixels per coordinate in both dimensions. Whichever
       // dimension has fewer, adjust to match the other dimension.
-      const pixels_per_coord_x = bound_box.width / x_span;
-      const pixels_per_coord_y = bound_box.height / y_span;
+      const pixels_per_coord_x = chart_bound_box.width / x_span;
+      const pixels_per_coord_y = chart_bound_box.height / y_span;
       if (pixels_per_coord_x < pixels_per_coord_y) {
         // We are keeping the x axis how it is and adjusting the y axis.
         pixels_per_coord = pixels_per_coord_x;
         const center_y = (y_span / 2) + this.#min_y;
-        y_span = bound_box.height / pixels_per_coord;
+        y_span = chart_bound_box.height / pixels_per_coord;
         const y_edge_offset = y_span / 2;
         this.#min_y = center_y - y_edge_offset;
         this.#max_y = center_y + y_edge_offset;
@@ -672,7 +722,7 @@ export class StarChart {
         // We are keeping the y axis how it is and adjusting the x axis.
         pixels_per_coord = pixels_per_coord_y;
         const center_x = (x_span / 2) + this.#min_x;
-        x_span = bound_box.width / pixels_per_coord;
+        x_span = chart_bound_box.width / pixels_per_coord;
         const x_edge_offset = x_span / 2;
         this.#min_x = center_x - x_edge_offset;
         this.#max_x = center_x + x_edge_offset;
@@ -683,8 +733,8 @@ export class StarChart {
         k_system_min_pixels_per_coord
       );
 
-      const new_x_span = bound_box.width / pixels_per_coord;
-      const new_y_span = bound_box.height / pixels_per_coord;
+      const new_x_span = chart_bound_box.width / pixels_per_coord;
+      const new_y_span = chart_bound_box.height / pixels_per_coord;
       const adjustment_x = new_x_span - x_span;
       const adjustment_y = new_y_span - y_span;
 
@@ -763,53 +813,136 @@ export class StarChart {
 
     update_waypoint_size();
     const display_x = waypoint =>
-      (bound_box.width * (waypoint.position.x - this.#min_x) / x_span) -
+      (chart_bound_box.width * (waypoint.position.x - this.#min_x) / x_span) -
       waypoint_total_size_halved;
     const display_y = waypoint =>
-      (bound_box.height * (waypoint.position.y - this.#min_y) / y_span) -
+      (chart_bound_box.height * (waypoint.position.y - this.#min_y) / y_span) -
       waypoint_total_size_halved;
-    const waypoint_id = waypoint =>
-      k_location_id_prefix + this.#chart_id + "_" + waypoint.symbol;
 
     for (const waypoint of to_render) {
-      const waypoint_el = document.createElement("img");
-      waypoint_el.classList.add(k_location_class_name);
-      waypoint_el.id = waypoint_id(waypoint);
-      waypoint_el.setAttribute(k_location_symbol_attr, waypoint.symbol);
-      waypoint_el.src = "/client/img/star_chart/waypoint/fallback.svg";
-      waypoint_el.style.width = `${waypoint_size}px`;
-      waypoint_el.style.height = `${waypoint_size}px`;
-      waypoint_el.style.left = `${display_x(waypoint)}px`;
-      waypoint_el.style.bottom = `${display_y(waypoint)}px`;
-      waypoint_el.style.padding = `${waypoint_padding_width}px`;
-      waypoint_el.style["border-width"] = `${waypoint_border_width}px`;
+      if (!waypoint.el) {
+        waypoint.el = m_utils.create_el("div", {classes: [k_location_class_name]});
 
-      // TODO: Render tooltip
-      // TODO: handle waypoint click
+        waypoint.icon_el =
+          m_utils.create_el("div", {parent: waypoint.el, classes: [k_location_icon_class_name]});
+        waypoint.icon_el.setAttribute(k_location_symbol_attr, waypoint.symbol);
+        waypoint.icon_el.style["background-image"] =
+          "url(\"/client/img/star_chart/waypoint/fallback.svg\")";
+        waypoint.icon_el.style.padding = `${waypoint_padding_width}px`;
+        waypoint.icon_el.style["border-width"] = `${waypoint_border_width}px`;
 
-      if (waypoint.orbitals.length > 0) {
-        waypoint_el.classList.add(k_orbited_location_class_name, k_clickable_location_class_name);
-      } else if (this.#selection_type == e_selection_type.waypoint) {
-        waypoint_el.classList.add(k_clickable_location_class_name);
+        waypoint.tooltip_el = m_utils.create_el("div", {classes: [k_tooltip_class_name]});
+        m_utils.create_el("h1", {parent: waypoint.tooltip_el, text: waypoint.symbol});
+        const tooltip_list_el = m_utils.create_el("ul", {
+          parent: waypoint.tooltip_el,
+          classes: [k_tooltip_data_list_class_name],
+        });
+        m_utils.create_el("li", {
+          parent: tooltip_list_el,
+          text: `Location: ${waypoint.position.x}, ${waypoint.position.y}`,
+        });
+        if (waypoint.orbits != null) {
+          m_utils.create_el("li", {parent: tooltip_list_el, text: `Orbits: ${waypoint.orbits}`});
+        }
+        m_utils.create_el("li", {parent: tooltip_list_el, text: `Type: ${waypoint.type.symbol}`});
+        const traits_li = m_utils.create_el("li", {parent: tooltip_list_el});
+        m_utils.create_el("h2", {parent: traits_li, text: "Traits"});
+        const traits = [];
+        for (const trait of waypoint.traits) {
+          const description_el = m_utils.create_el("p", {
+            text: trait.description,
+            classes: [k_tooltip_trait_description_class_name],
+          });
+          traits.push([trait.name, trait.name, description_el]);
+        }
+        const trait_click_handler = ({list, item, id}) => {
+          item.classList.toggle(k_tooltip_expanded_trait_class_name);
+          this.#position_size_and_show_tooltip(waypoint);
+        };
+        const trait_list = m_list.create_selectable(traits, trait_click_handler);
+        traits_li.append(trait_list);
+        if (waypoint.orbitals.length) {
+          const orbitals_li = m_utils.create_el("li", {parent: tooltip_list_el});
+          m_utils.create_el("h2", {parent: orbitals_li, text: "Orbitals"});
+          const orbitals_list = m_utils.create_el("ul", {parent: orbitals_li});
+          for (const orbital of waypoint.orbitals) {
+            m_utils.create_el("li", {parent: orbitals_list, text: orbital});
+          }
+        }
+
+        waypoint.tooltip_show_fn = () => this.#position_size_and_show_tooltip(waypoint);
+        waypoint.connect_tooltip_show_listener = () => {
+          waypoint.el.addEventListener("mouseenter", waypoint.tooltip_show_fn);
+        };
+        waypoint.disconnect_tooltip_show_listener = () => {
+          waypoint.el.removeEventListener("mouseenter", waypoint.tooltip_show_fn);
+        };
+
+        // TODO: handle waypoint click
+
+        if (waypoint.orbitals.length > 0) {
+          waypoint.el.classList.add(k_orbited_location_class_name,
+                                    k_clickable_location_class_name);
+        } else if (this.#selection_type == e_selection_type.waypoint) {
+          waypoint.el.classList.add(k_clickable_location_class_name);
+        }
       }
+      waypoint.el_size = waypoint_total_size;
+      waypoint.el_x = display_x(waypoint);
+      waypoint.el_y = display_y(waypoint);
+      waypoint.el.style.width = `${waypoint_total_size}px`;
+      waypoint.el.style.height = `${waypoint_total_size}px`;
+      waypoint.el.style.left = `${waypoint.el_x}px`;
+      waypoint.el.style.bottom = `${waypoint.el_y}px`;
 
-      this.#chart_el.append(waypoint_el);
+      this.#chart_el.append(waypoint.el);
+      waypoint.connect_tooltip_show_listener();
       waypoint.rendered = true;
     }
 
     for (const waypoint of to_move) {
-      const waypoint_el = document.getElementById(waypoint_id(waypoint));
-      waypoint_el.style.left = `${display_x(waypoint)}px`;
-      waypoint_el.style.bottom = `${display_y(waypoint)}px`;
-      waypoint_el.style.width = `${waypoint_size}px`;
-      waypoint_el.style.height = `${waypoint_size}px`;
-      waypoint_el.style.padding = `${waypoint_padding_width}px`;
-      waypoint_el.style["border-width"] = `${waypoint_border_width}px`;
+      waypoint.el_x = display_x(waypoint);
+      waypoint.el_y = display_y(waypoint);
+      waypoint.el_size = waypoint_total_size;
+      waypoint.el.style.left = `${waypoint.el_x}px`;
+      waypoint.el.style.bottom = `${waypoint.el_y}px`;
+      waypoint.el.style.width = `${waypoint_total_size}px`;
+      waypoint.el.style.height = `${waypoint_total_size}px`;
+      waypoint.icon_el.style.padding = `${waypoint_padding_width}px`;
+      waypoint.icon_el.style["border-width"] = `${waypoint_border_width}px`;
     }
 
     for (const waypoint of to_unrender) {
-      document.getElementById(waypoint_id(waypoint)).remove();
+      waypoint.el.remove();
+      waypoint.disconnect_tooltip_show_listener();
       waypoint.rendered = false;
+    }
+
+    // If there is a tooltip already showing, we may need to adjust it, otherwise its sizing may be
+    // wrong for the current window size.
+    let tooltip_adjusted = false;
+    if (this.#active_tooltip_waypoint) {
+      const tooltip_bound_box = this.#active_tooltip_waypoint.tooltip_el.getBoundingClientRect();
+      if (this.#bound_box_contains_mouse(tooltip_bound_box)) {
+        this.#position_size_and_show_tooltip(this.#active_tooltip_waypoint);
+        tooltip_adjusted = true;
+      }
+    }
+    if (!tooltip_adjusted) {
+      const visible = to_render.concat(to_move);
+      let waypoint_with_tooltip;
+      for (const waypoint of visible) {
+        const waypoint_bound_box = waypoint.el.getBoundingClientRect();
+        if (this.#bound_box_contains_mouse(waypoint_bound_box)) {
+          this.#position_size_and_show_tooltip(waypoint);
+          tooltip_adjusted = true;
+          break;
+        }
+      }
+    }
+    if (!tooltip_adjusted) {
+      // We aren't over the tooltip or a waypoint. Make sure the waypoint is hidden.
+      this.#remove_current_tooltip();
     }
 
     if (upper_overflow) {
@@ -865,6 +998,91 @@ export class StarChart {
       }
     }
   }
+
+  #position_size_and_show_tooltip(waypoint) {
+    if (this.#active_tooltip_waypoint != waypoint) {
+      if (this.#active_tooltip_waypoint) {
+        this.#remove_current_tooltip();
+      }
+      this.#active_tooltip_waypoint = waypoint;
+
+      waypoint.el.append(waypoint.tooltip_el);
+      waypoint.tooltip_el.style.width = `${k_tooltip_width_px}px`;
+    }
+
+    // Reset the way we displayed it last time
+    waypoint.tooltip_el.style.overflow = "visible";
+    waypoint.tooltip_el.style.top = "auto";
+    waypoint.tooltip_el.style.bottom = "auto";
+    waypoint.tooltip_el.style.left = "auto";
+    waypoint.tooltip_el.style.right = "auto";
+
+    // -1 to make sure there is at least a little overlap
+    waypoint.tooltip_el.style.left = `${waypoint.el_size - 1}px`;
+    waypoint.tooltip_el.style.bottom = "0";
+
+    let tooltip_bound_box = waypoint.tooltip_el.getBoundingClientRect();
+    const chart_bound_box = this.#chart_el.getBoundingClientRect();
+    if (chart_bound_box.top > tooltip_bound_box.top) {
+      const waypoint_bound_box = waypoint.el.getBoundingClientRect();
+      waypoint.tooltip_el.style.top = `${chart_bound_box.top - waypoint_bound_box.top}px`;
+      waypoint.tooltip_el.style.bottom = "auto";
+      tooltip_bound_box = waypoint.tooltip_el.getBoundingClientRect();
+      if (chart_bound_box.bottom < tooltip_bound_box.bottom) {
+        waypoint.tooltip_el.style.bottom =
+          `${waypoint_bound_box.bottom - chart_bound_box.bottom}px`;
+        waypoint.tooltip_el.style.overflow = "scroll";
+      }
+    }
+
+    if (chart_bound_box.right < tooltip_bound_box.right) {
+      waypoint.tooltip_el.style.left = "auto";
+      waypoint.tooltip_el.style.right = `${waypoint.el_size}px`;
+    }
+  }
+
+  #remove_current_tooltip() {
+    if (!this.#active_tooltip_waypoint) {
+      return;
+    }
+
+    this.#active_tooltip_waypoint.connect_tooltip_show_listener();
+    this.#active_tooltip_waypoint.tooltip_el.remove();
+
+    this.#active_tooltip_waypoint = null;
+  }
+
+  /**
+   * @param box
+   *        A `DOMRect`, typically one returned by `Element.getBoundingClientRect()`.
+   * @returns
+   *        `true` if the cursor's position is known and lies within `box`, else `false`.
+   */
+  #bound_box_contains_mouse(box) {
+    if (this.#mouse_x == null || this.#mouse_y == null) {
+      return false;
+    }
+    return bound_box_contains(box, this.#mouse_x, this.#mouse_y);
+  }
+}
+
+/**
+ * @param box
+ *        A `DOMRect`, typically one returned by `Element.getBoundingClientRect()`.
+ * @param x
+ *        The x coordinate of the point to check.
+ * @param y
+ *        The y coordinate of the point to check.
+ * @returns
+ *        `true` if (`x`, `y`) lies within `box`, else `false`.
+ */
+function bound_box_contains(box, x, y) {
+  if (box.width == 0 || box.height == 0) {
+    // Even if the mouse is directly over the box location, never consider anything to be within a
+    // zero-sized box.
+    return false;
+  }
+  return box.top <= y && box.bottom >= y && box.left <= x && box.right >= x;
 }
 
 /**
