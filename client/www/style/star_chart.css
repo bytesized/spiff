@@ -95,7 +95,7 @@
 .star_chart .tooltip {
   display: none;
 
-  cursor: default;
+  cursor: auto;
 
   padding: 0;
   margin: 0;
