@@ -9,6 +9,7 @@ import * as m_storage from "../storage.mjs";
 
 let g_star_chart;
 let g_page_active = false;
+let g_initial_waypoint = null;
 
 async function show_chart_loading_error(progress_el, message) {
   m_progress.set_error(progress_el);
@@ -37,11 +38,14 @@ export async function init({page_el, progress_el, reinit}) {
       selected_only: true,
       properties: ["id"],
       callback: event => {
-        if (event.selection_set && g_star_chart) {
-          g_star_chart.auth_token = event.entry.auth_token;
-          g_star_chart.set_location(m_star_chart.e_location_type.waypoint,
-                                    event.entry.headquarters,
-                                    m_star_chart.e_location_view_type.centered_on);
+        if (event.selection_set) {
+          g_initial_waypoint = event.entry.headquarters;
+          if (g_star_chart) {
+            g_star_chart.auth_token = event.entry.auth_token;
+            g_star_chart.set_location(m_star_chart.e_location_type.waypoint,
+                                      event.entry.headquarters,
+                                      m_star_chart.e_location_view_type.centered_on);
+          }
         }
       },
     }));
@@ -89,7 +93,6 @@ export async function init({page_el, progress_el, reinit}) {
       let activated = m_star_chart.e_activation.inactive;
       let auth_token = null;
       let initial_location_type = null;
-      let initial_location = null;
       let initial_location_view_type = null;
       if (selected_agent) {
         if (g_page_active) {
@@ -97,7 +100,7 @@ export async function init({page_el, progress_el, reinit}) {
         }
         auth_token = selected_agent.auth_token;
         initial_location_type = m_star_chart.e_location_type.waypoint;
-        initial_location = selected_agent.headquarters;
+        g_initial_waypoint = selected_agent.headquarters;
         initial_location_view_type = m_star_chart.e_location_view_type.centered_on;
       }
 
@@ -105,7 +108,7 @@ export async function init({page_el, progress_el, reinit}) {
         m_star_chart.e_selection_type.view_only,
         activated,
         auth_token,
-        initial_location_type, initial_location, initial_location_view_type
+        initial_location_type, g_initial_waypoint, initial_location_view_type
       );
       page_el.append(g_star_chart.element);
 
@@ -147,6 +150,12 @@ export function on_page_activate() {
   g_page_active = true;
   if (g_star_chart) {
     g_star_chart.activate();
+    if (g_initial_waypoint) {
+      // This is asynchronous, but we are just going to kick it off.
+      g_star_chart.set_location(m_star_chart.e_location_type.waypoint,
+                                g_initial_waypoint,
+                                m_star_chart.e_location_view_type.centered_on);
+    }
   }
 }
 

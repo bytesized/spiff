@@ -40,6 +40,7 @@ const e_rerender_reason = Object.freeze({
   chart_resize: "e_rerender_reason::chart_resize",
   scroll: "e_rerender_reason::scroll",
   zoom: "e_rerender_reason::zoom",
+  view_change: "e_rerender_reason::view_change",
 });
 
 const e_pan_direction = Object.freeze({
@@ -65,6 +66,7 @@ const k_tooltip_expanded_trait_class_name = "expanded";
 const k_tooltip_trait_description_class_name = "trait_description";
 const k_upper_overflow_indicator_class_name = "top";
 
+const k_orbital_view_pixels_per_coordinate = 1;
 const k_pan_base_distance = 5;
 const k_pan_interval_ms = 25;
 const k_system_edge_buffer_px = 25;
@@ -116,6 +118,10 @@ export class StarChart {
   //   icon_el
   //     Will be present if the icon is currently rendered. Will be the DOM element that visually
   //     represents the waypoint.
+  //   index
+  //     Will be present if the star chart is displaying the orbitals of a waypoint and this
+  //     waypoint is one of the orbitals. Will be an integer indicating the sorted position of the
+  //     orbital relative to the other orbitals. May contain stale data if `!rendered`.
   //   rendered
   //     Will be `true` if the waypoint is currently rendered. May not be present or may be `false`
   //     if the waypoint has not been rendered.
@@ -259,7 +265,7 @@ export class StarChart {
     // available when we want to zoom towards where the mouse is.
     this.#chart_el.addEventListener("mousemove", this.#on_mouse_move.bind(this));
     this.#chart_el.addEventListener("wheel", event => {
-      if (event.wheelDeltaY == 0 || !this.usable) {
+      if (event.wheelDeltaY == 0 || !this.usable || this.#current_waypoint) {
         return;
       }
       if (this.#active_tooltip_waypoint) {
@@ -278,7 +284,7 @@ export class StarChart {
       if (this.#mouse_y != null) {
         render_options.zoom_center_y = 1 - ((this.#mouse_y - bound_box.y) / bound_box.height);
       }
-      this.#system_chart_rerender(e_rerender_reason.zoom, render_options);
+      this.#chart_rerender(e_rerender_reason.zoom, render_options);
     });
 
     this.#location_change_queue.on_before_start(() => this.#set_loading());
@@ -446,7 +452,7 @@ export class StarChart {
         if (this.#destroyed) {
           return;
         }
-        this.#system_char_initial_render();
+        this.#chart_initial_render();
       }
     });
   }
@@ -517,10 +523,10 @@ export class StarChart {
           }
           if (this.#pan_interval_id == null) {
             this.#pan_interval_id = setInterval(
-              () => this.#system_chart_rerender(e_rerender_reason.pan),
+              () => this.#chart_rerender(e_rerender_reason.pan),
               k_pan_interval_ms
             );
-            this.#system_chart_rerender(e_rerender_reason.pan);
+            this.#chart_rerender(e_rerender_reason.pan);
           }
         },
         keyup: event => {
@@ -557,7 +563,7 @@ export class StarChart {
       this.#resize_observer.observe(this.#chart_el);
       // Quite possibly we would have fired this when the observer was disconnected, so fire it
       // now.
-      this.#system_chart_rerender(e_rerender_reason.chart_resize);
+      this.#chart_rerender(e_rerender_reason.chart_resize);
     }
 
     for (const event in this.#navigation_callbacks) {
@@ -588,9 +594,9 @@ export class StarChart {
   /**
    * This function should only be used for the initial render.
    *
-   * Waypoint data for this system must already be loaded.
+   * If not rendering the universe, waypoint data for the system must already be loaded.
    */
-  #system_char_initial_render() {
+  #chart_initial_render() {
     this.#reset_chart_el();
     for (const symbol in this.#current_system.waypoints) {
       this.#current_system.waypoints[symbol].rendered = false;
@@ -602,13 +608,13 @@ export class StarChart {
       this.#mouse_x = null;
       this.#mouse_y = null;
 
-      this.#system_chart_rerender(e_rerender_reason.chart_resize);
+      this.#chart_rerender(e_rerender_reason.chart_resize);
     });
-    if (this.#active != e_activation.active) {
+    if (this.#active == e_activation.active) {
       this.#resize_observer.observe(this.#chart_el);
     }
 
-    this.#system_chart_rerender(e_rerender_reason.initial_render);
+    this.#chart_rerender(e_rerender_reason.initial_render);
   }
 
   /**
@@ -631,26 +637,63 @@ export class StarChart {
    *        Optionally specified if `reason == e_rerender_reason.zoom` (not used otherwise). If
    *        unspecified, it will be as if the cursor is in the center of the map.
    */
-  #system_chart_rerender(reason, {zoom_by, zoom_center_x, zoom_center_y} = {}) {
+  #chart_rerender(reason, {zoom_by, zoom_center_x, zoom_center_y} = {}) {
     const waypoints = [];
     for (const symbol in this.#current_system.waypoints) {
       const waypoint = this.#current_system.waypoints[symbol];
-      if (waypoint.orbits == this.#current_waypoint) {
+      if (waypoint.orbits == this.#current_waypoint || symbol == this.#current_waypoint) {
         waypoints.push(waypoint);
+      }
+    }
+    if (this.#current_waypoint) {
+      waypoints.sort((a, b) => {
+        if (a.symbol == b.symbol) {
+          return 0;
+        }
+        if (a.symbol < b.symbol) {
+          return -1;
+        }
+        return 1;
+      });
+      let index = 0;
+      for (const waypoint of waypoints) {
+        if (waypoint.symbol != this.#current_waypoint) {
+          waypoint.index = index;
+          index += 1;
+        }
       }
     }
 
     const chart_bound_box = this.#chart_el.getBoundingClientRect();
 
-    if (chart_bound_box.width == 0 || chart_bound_box.height == 0 || waypoints.length < 1) {
+    const invalid_chart = chart_bound_box.width == 0 ||
+                          chart_bound_box.height == 0 ||
+                          waypoints.length < 1;
+    if (invalid_chart || reason == e_rerender_reason.view_change) {
       this.#chart_el.replaceChildren();
       for (const symbol in this.#current_system.waypoints) {
         this.#current_system.waypoints[symbol].rendered = false;
       }
-      return;
+      if (invalid_chart) {
+        return;
+      }
     }
 
-    const resize_to_fit = reason == e_rerender_reason.chart_resize || this.#min_x == null;
+    if (this.#current_waypoint) {
+      // When viewing the orbitals of a waypoint, they all have the same coordinates, so defining
+      // view bounds isn't really meaningful.
+      this.#min_x = null;
+      this.#max_x = null;
+      this.#min_y = null;
+      this.#max_y = null;
+    }
+
+    const resize_to_fit = !this.#current_waypoint &&
+                          (
+                            reason == e_rerender_reason.chart_resize ||
+                            reason == e_rerender_reason.view_change ||
+                            this.#min_x == null
+                          );
     if (resize_to_fit) {
       // We are going to initially display the system to fit the chart.
       this.#min_x = waypoints.reduce(
@@ -674,8 +717,12 @@ export class StarChart {
     let x_span = this.#max_x - this.#min_x;
     let y_span = this.#max_y - this.#min_y;
 
-    let pixels_per_coord =
-      Math.min(chart_bound_box.width / x_span, chart_bound_box.height / y_span);
+    let pixels_per_coord;
+    if (this.#current_waypoint) {
+      pixels_per_coord = k_orbital_view_pixels_per_coordinate;
+    } else {
+      pixels_per_coord = Math.min(chart_bound_box.width / x_span, chart_bound_box.height / y_span);
+    }
 
     let waypoint_content_size;
     let waypoint_padding_width;
@@ -783,19 +830,21 @@ export class StarChart {
 
     for (const waypoint of waypoints) {
       let should_render = true;
-      if (waypoint.position.x < this.#min_x) {
-        should_render = false;
-        left_overflow = true;
-      } else if (waypoint.position.x > this.#max_x) {
-        should_render = false;
-        right_overflow = true;
-      }
-      if (waypoint.position.y < this.#min_y) {
-        should_render = false;
-        lower_overflow = true;
-      } else if (waypoint.position.y > this.#max_y) {
-        should_render = false;
-        upper_overflow = true;
+      if (!this.#current_waypoint) {
+        if (waypoint.position.x < this.#min_x) {
+          should_render = false;
+          left_overflow = true;
+        } else if (waypoint.position.x > this.#max_x) {
+          should_render = false;
+          right_overflow = true;
+        }
+        if (waypoint.position.y < this.#min_y) {
+          should_render = false;
+          lower_overflow = true;
+        } else if (waypoint.position.y > this.#max_y) {
+          should_render = false;
+          upper_overflow = true;
+        }
       }
 
       if (should_render) {
@@ -812,12 +861,42 @@ export class StarChart {
     }
 
     update_waypoint_size();
-    const display_x = waypoint =>
-      (chart_bound_box.width * (waypoint.position.x - this.#min_x) / x_span) -
-      waypoint_total_size_halved;
-    const display_y = waypoint =>
-      (chart_bound_box.height * (waypoint.position.y - this.#min_y) / y_span) -
-      waypoint_total_size_halved;
+    let display_x;
+    let display_y;
+    if (this.#current_waypoint) {
+      const angular_spacing = 2 * Math.PI / (waypoints.length - 1);
+      const orbit_distance = (Math.min(chart_bound_box.width, chart_bound_box.height) / 2) -
+                             k_system_edge_buffer_px;
+      const center_x = chart_bound_box.width / 2;
+      const center_y = chart_bound_box.height / 2;
+      display_x = waypoint => {
+        if (waypoint.symbol == this.#current_waypoint) {
+          return center_x - waypoint_total_size_halved;
+        }
+        return (
+          center_x +
+          (Math.cos(angular_spacing * waypoint.index) * orbit_distance) -
+          waypoint_total_size_halved
+        );
+      };
+      display_y = waypoint => {
+        if (waypoint.symbol == this.#current_waypoint) {
+          return center_y - waypoint_total_size_halved;
+        }
+        return (
+          center_y +
+          (Math.sin(angular_spacing * waypoint.index) * orbit_distance) -
+          waypoint_total_size_halved
+        );
+      };
+    } else {
+      display_x = waypoint =>
+        (chart_bound_box.width * (waypoint.position.x - this.#min_x) / x_span) -
+        waypoint_total_size_halved;
+      display_y = waypoint =>
+        (chart_bound_box.height * (waypoint.position.y - this.#min_y) / y_span) -
+        waypoint_total_size_halved;
+    }
 
     for (const waypoint of to_render) {
       if (!waypoint.el) {
@@ -878,15 +957,30 @@ export class StarChart {
           waypoint.el.removeEventListener("mouseenter", waypoint.tooltip_show_fn);
         };
 
-        // TODO: handle waypoint click
+        waypoint.el.addEventListener("click", () => {
+          if (waypoint.orbitals.length) {
+            this.#current_waypoint = waypoint.symbol;
+            this.#chart_rerender(e_rerender_reason.view_change);
+          } else if (this.#selection_type == e_selection_type.waypoint) {
+            this.#close_resolve_fn({
+              reason: e_chart_close_reason.selection,
+              selection: waypoint.symbol
+            });
+          }
+        });
 
-        if (waypoint.orbitals.length > 0) {
-          waypoint.el.classList.add(k_orbited_location_class_name,
-                                    k_clickable_location_class_name);
-        } else if (this.#selection_type == e_selection_type.waypoint) {
-          waypoint.el.classList.add(k_clickable_location_class_name);
+        if (waypoint.orbitals.length) {
+          waypoint.el.classList.add(k_orbited_location_class_name);
         }
       }
+
+      if (this.#selection_type == e_selection_type.waypoint ||
+          (waypoint.orbitals.length && !this.#current_waypoint)) {
+        waypoint.el.classList.add(k_clickable_location_class_name);
+      } else {
+        waypoint.el.classList.remove(k_clickable_location_class_name);
+      }
+
       waypoint.el_size = waypoint_total_size;
       waypoint.el_x = display_x(waypoint);
       waypoint.el_y = display_y(waypoint);
