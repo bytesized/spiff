@@ -1,3 +1,5 @@
+// TODO: Add argument to set module log level at runtime
+
 export const e_log_level = Object.freeze({
   debug: 1,
   info: 2,

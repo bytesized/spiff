@@ -514,6 +514,7 @@ async function load_system_data(
     const response = await m_api.get_waypoints(auth_token, system_symbol, page, priority);
 
     if (!response.success) {
+      // TODO: Timed retry of waypoint loading
       return {
         success: false,
         error_message:
