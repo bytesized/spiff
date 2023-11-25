@@ -40,7 +40,6 @@ const e_rerender_reason = Object.freeze({
   chart_resize: "e_rerender_reason::chart_resize",
   scroll: "e_rerender_reason::scroll",
   zoom: "e_rerender_reason::zoom",
-  view_change: "e_rerender_reason::view_change",
 });
 
 const e_pan_direction = Object.freeze({
@@ -207,6 +206,7 @@ export class StarChart {
    *        `null`, in which case the chart will just display as loading until `set_location` is
    *        called. If this is `null`, `initial_location_type` and `initial_location` should also
    *        be `null`.
+   * TODO: Add argument/method to allow certain waypoints/systems to be recolored.
    */
   constructor(
     selection_type, active = e_activation.active, auth_token = null,
@@ -397,7 +397,6 @@ export class StarChart {
     this.#close_resolve_fn({reason: e_chart_close_reason.cancelled});
   }
 
-  // TODO: Use or remove
   async #on_location_selected(location_type, location) {
     if (this.#location_change_queue.is_busy) {
       // Don't allow a location to be clicked while we are changing map location.
@@ -424,36 +423,34 @@ export class StarChart {
         this.#current_waypoint = null;
         // TODO: Load and render universe data
         throw new Error("Not yet implemented");
-      } else {
-        // We are loading a system or a waypoint orbital map
-        if (type == e_location_type.system) {
-          if (!this.#current_system || symbol != this.#current_system.system.symbol) {
-            k_log.raise_if(!this.#auth_token, "Missing authentication token");
-            const response = await m_server.star_chart.waypoints(this.#auth_token, symbol);
-            k_log.raise_if(!response.success, "Failed to get system data from server:",
-                           response.error_message);
-            this.#current_system = response.result;
-          }
-          this.#current_waypoint = null;
-        } else { // type == e_location_type.waypoint
-          if (!this.#current_system || !(symbol in this.#current_system.waypoints)) {
-            k_log.raise_if(!this.#auth_token, "Missing authentication token");
-            const response = await m_server.star_chart.sibling_waypoints(this.#auth_token, symbol);
-            k_log.raise_if(!response.success, "Failed to get waypoint data from server:",
-                           response.error_message);
-            this.#current_system = response.result;
-          }
-          if (view == e_location_view_type.zoomed_in_to) {
-            this.#current_waypoint = symbol;
-          } else {
-            this.#current_waypoint = this.#current_system.waypoints[symbol].orbits;
-          }
+      } else if (type == e_location_type.system) { // Zoomed into system
+        if (!this.#current_system || symbol != this.#current_system.system.symbol) {
+          k_log.raise_if(!this.#auth_token, "Missing authentication token");
+          const response = await m_server.star_chart.waypoints(this.#auth_token, symbol);
+          k_log.raise_if(!response.success, "Failed to get system data from server:",
+                         response.error_message);
+          this.#current_system = response.result;
         }
-        if (this.#destroyed) {
-          return;
+        this.#current_waypoint = null;
+      } else { // type == e_location_type.waypoint
+        if (!this.#current_system || !(symbol in this.#current_system.waypoints)) {
+          k_log.raise_if(!this.#auth_token, "Missing authentication token");
+          const response = await m_server.star_chart.sibling_waypoints(this.#auth_token, symbol);
+          k_log.raise_if(!response.success, "Failed to get waypoint data from server:",
+                         response.error_message);
+          this.#current_system = response.result;
         }
-        this.#chart_initial_render();
+        if (view == e_location_view_type.zoomed_in_to) {
+          this.#current_waypoint = symbol;
+        } else {
+          this.#current_waypoint = this.#current_system.waypoints[symbol].orbits;
+        }
       }
+
+      if (this.#destroyed) {
+        return;
+      }
+      this.#chart_initial_render();
     });
   }
 
@@ -666,17 +663,13 @@ export class StarChart {
 
     const chart_bound_box = this.#chart_el.getBoundingClientRect();
 
-    const invalid_chart = chart_bound_box.width == 0 ||
-                          chart_bound_box.height == 0 ||
-                          waypoints.length < 1;
-    if (invalid_chart || reason == e_rerender_reason.view_change) {
+    if (chart_bound_box.width == 0 || chart_bound_box.height == 0 || waypoints.length < 1) {
+      // TODO: retain back button?
       this.#chart_el.replaceChildren();
       for (const symbol in this.#current_system.waypoints) {
         this.#current_system.waypoints[symbol].rendered = false;
       }
-      if (invalid_chart) {
-        return;
-      }
+      return;
     }
 
     if (this.#current_waypoint) {
@@ -691,7 +684,6 @@ export class StarChart {
     const resize_to_fit = !this.#current_waypoint &&
                           (
                             reason == e_rerender_reason.chart_resize ||
-                            reason == e_rerender_reason.view_change ||
                             this.#min_x == null
                           );
     if (resize_to_fit) {
