@@ -959,8 +959,7 @@ export class StarChart {
 
         waypoint.el.addEventListener("click", () => {
           if (waypoint.orbitals.length) {
-            this.#current_waypoint = waypoint.symbol;
-            this.#chart_rerender(e_rerender_reason.view_change);
+            this.#on_location_selected(e_location_type.waypoint, waypoint.symbol);
           } else if (this.#selection_type == e_selection_type.waypoint) {
             this.#close_resolve_fn({
               reason: e_chart_close_reason.selection,
