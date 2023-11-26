@@ -11,6 +11,21 @@
   container-name: subspinner-overlay-resize-box;
 }
 
+/**
+ * These are used to group elements and ensure that they stay in the correct stacking order. They
+ * are intentionally size 0 so that they don't cover up lower elements and preventing `:hover`
+ * selectors from working properly. Since they aren't positioned elements and everything in them
+ * uses `position: absolute`, their size and position doesn't affect the size and position of their
+ * child elements.
+ */
+.star_chart .layer {
+  border-width: 0;
+  margin: 0;
+  padding: 0;
+  width: 0;
+  height: 0;
+}
+
 .star_chart .location {
   position: absolute;
 }
@@ -150,4 +165,27 @@
 
 .star_chart .tooltip li.expanded .trait_description {
   display: block;
+}
+
+.star_chart .back_button_background {
+  border-radius: var(--border_radius);
+  border-width: 0;
+  background-color: var(--subtle_accent_color);
+  cursor: pointer;
+
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+}
+
+.star_chart .back_button_image {
+  cursor: pointer;
+
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }

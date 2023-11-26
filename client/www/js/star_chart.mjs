@@ -55,6 +55,9 @@ const k_orbited_location_class_name = "orbited";
 const k_clickable_location_class_name = "clickable";
 const k_location_symbol_attr = "data-symbol";
 
+const k_back_button_background_class_name = "back_button_background";
+const k_back_button_image_class_name = "back_button_image";
+const k_layer_class_name = "layer";
 const k_left_overflow_indicator_class_name = "left";
 const k_lower_overflow_indicator_class_name = "bottom";
 const k_overflow_indicator_class_name = "overflow_indicator";
@@ -87,11 +90,15 @@ let g_next_chart_id = 0;
 export class StarChart {
   #active = e_activation.inactive;
   #auth_token;
-  #chart_el;
   #chart_id;
   #close_resolve_fn;
   #close_promise;
   #navigation_callbacks = null;
+
+  #chart_el;
+  #busy_spinner_layer_el;
+  #overlay_layer_el;
+  #display_layer_el;
 
   // If non-`null`, matches the `result.waypoints` format of the `server/star_chart/waypoints` and
   // `server/star_chart/sibling_waypoints` local API endpoints. If `null`, we are viewing the
@@ -258,8 +265,15 @@ export class StarChart {
 
     this.#auth_token = auth_token;
 
-    this.#chart_el = document.createElement("div");
-    this.#chart_el.classList.add(k_star_chart_class_name);
+    // Ordering is important here so that the layers stack in the correct order. Layers created
+    // later are on top of layers created earlier.
+    this.#chart_el = m_utils.create_el("div", {classes: [k_star_chart_class_name]});
+    this.#display_layer_el =
+      m_utils.create_el("div", {parent: this.#chart_el, classes: [k_layer_class_name]});
+    this.#overlay_layer_el =
+      m_utils.create_el("div", {parent: this.#chart_el, classes: [k_layer_class_name]});
+    this.#busy_spinner_layer_el =
+      m_utils.create_el("div", {parent: this.#chart_el, classes: [k_layer_class_name]});
 
     // Apparently we can't just get the mouse position for some reason. We have to track it so it's
     // available when we want to zoom towards where the mouse is.
@@ -350,7 +364,7 @@ export class StarChart {
   }
 
   get loading() {
-    return !this.#destroyed && m_busy_spinner.has_busy_spinner(this.#chart_el);
+    return !this.#destroyed && m_busy_spinner.has_busy_spinner(this.#busy_spinner_layer_el);
   }
 
   /**
@@ -373,11 +387,11 @@ export class StarChart {
     const spinner = m_busy_spinner.create(
       {with_overlay: true, size: m_busy_spinner.e_spinner_size.x_large}
     );
-    this.#chart_el.append(spinner);
+    this.#busy_spinner_layer_el.append(spinner);
   }
 
   #clear_loading() {
-    m_busy_spinner.remove_overlay(this.#chart_el);
+    m_busy_spinner.remove_overlay(this.#busy_spinner_layer_el);
   }
 
   #destroy_resize_observer() {
@@ -397,13 +411,13 @@ export class StarChart {
     this.#close_resolve_fn({reason: e_chart_close_reason.cancelled});
   }
 
-  async #on_location_selected(location_type, location) {
+  async #set_location_if_not_busy(type, symbol, view) {
     if (this.#location_change_queue.is_busy) {
       // Don't allow a location to be clicked while we are changing map location.
       return;
     }
 
-    await this.set_location(location_type, location, e_location_view_type.zoomed_in_to);
+    await this.set_location(type, symbol, view);
   }
 
   async set_location(type, symbol, view) {
@@ -456,7 +470,8 @@ export class StarChart {
 
   #reset_chart_el() {
     this.#destroy_resize_observer();
-    this.#chart_el.replaceChildren();
+    this.#display_layer_el.replaceChildren();
+    this.#overlay_layer_el.replaceChildren();
 
     this.#min_x = null;
     this.#max_x = null;
@@ -599,7 +614,17 @@ export class StarChart {
       this.#current_system.waypoints[symbol].rendered = false;
     }
 
-    // TODO: Render back button
+    const back_button_background = m_utils.create_el("div", {
+      parent: this.#overlay_layer_el,
+      classes: [k_back_button_background_class_name],
+    });
+    back_button_background.addEventListener("click", this.#on_back_button_click.bind(this));
+    const back_button_image = m_utils.create_el("img", {
+      parent: this.#overlay_layer_el,
+      classes: [k_back_button_image_class_name],
+    });
+    back_button_image.src = "/client/img/back_arrow.svg";
+    back_button_image.addEventListener("click", this.#on_back_button_click.bind(this));
 
     this.#resize_observer = new ResizeObserver(entries => {
       this.#mouse_x = null;
@@ -664,8 +689,7 @@ export class StarChart {
     const chart_bound_box = this.#chart_el.getBoundingClientRect();
 
     if (chart_bound_box.width == 0 || chart_bound_box.height == 0 || waypoints.length < 1) {
-      // TODO: retain back button?
-      this.#chart_el.replaceChildren();
+      this.#display_layer_el.replaceChildren();
       for (const symbol in this.#current_system.waypoints) {
         this.#current_system.waypoints[symbol].rendered = false;
       }
@@ -949,9 +973,10 @@ export class StarChart {
           waypoint.el.removeEventListener("mouseenter", waypoint.tooltip_show_fn);
         };
 
-        waypoint.el.addEventListener("click", () => {
+        waypoint.el.addEventListener("click", async () => {
           if (waypoint.orbitals.length) {
-            this.#on_location_selected(e_location_type.waypoint, waypoint.symbol);
+            await this.#set_location_if_not_busy(e_location_type.waypoint, waypoint.symbol,
+                                                 e_location_view_type.zoomed_in_to);
           } else if (this.#selection_type == e_selection_type.waypoint) {
             this.#close_resolve_fn({
               reason: e_chart_close_reason.selection,
@@ -980,7 +1005,7 @@ export class StarChart {
       waypoint.el.style.left = `${waypoint.el_x}px`;
       waypoint.el.style.bottom = `${waypoint.el_y}px`;
 
-      this.#chart_el.append(waypoint.el);
+      this.#display_layer_el.append(waypoint.el);
       waypoint.connect_tooltip_show_listener();
       waypoint.rendered = true;
     }
@@ -1032,10 +1057,10 @@ export class StarChart {
 
     if (upper_overflow) {
       if (!this.#upper_overflow_indicator) {
-        this.#upper_overflow_indicator = document.createElement("div");
-        this.#upper_overflow_indicator.classList.add(k_overflow_indicator_class_name,
-                                                     k_upper_overflow_indicator_class_name);
-        this.#chart_el.append(this.#upper_overflow_indicator);
+        this.#upper_overflow_indicator = m_utils.create_el("div", {
+          parent: this.#display_layer_el,
+          classes: [k_overflow_indicator_class_name, k_upper_overflow_indicator_class_name],
+        });
       }
     } else {
       if (this.#upper_overflow_indicator) {
@@ -1045,10 +1070,10 @@ export class StarChart {
     }
     if (lower_overflow) {
       if (!this.#lower_overflow_indicator) {
-        this.#lower_overflow_indicator = document.createElement("div");
-        this.#lower_overflow_indicator.classList.add(k_overflow_indicator_class_name,
-                                                     k_lower_overflow_indicator_class_name);
-        this.#chart_el.append(this.#lower_overflow_indicator);
+        this.#lower_overflow_indicator = m_utils.create_el("div", {
+          parent: this.#display_layer_el,
+          classes: [k_overflow_indicator_class_name, k_lower_overflow_indicator_class_name],
+        });
       }
     } else {
       if (this.#lower_overflow_indicator) {
@@ -1058,10 +1083,10 @@ export class StarChart {
     }
     if (left_overflow) {
       if (!this.#left_overflow_indicator) {
-        this.#left_overflow_indicator = document.createElement("div");
-        this.#left_overflow_indicator.classList.add(k_overflow_indicator_class_name,
-                                                    k_left_overflow_indicator_class_name);
-        this.#chart_el.append(this.#left_overflow_indicator);
+        this.#left_overflow_indicator = m_utils.create_el("div", {
+          parent: this.#display_layer_el,
+          classes: [k_overflow_indicator_class_name, k_left_overflow_indicator_class_name],
+        });
       }
     } else {
       if (this.#left_overflow_indicator) {
@@ -1071,10 +1096,10 @@ export class StarChart {
     }
     if (right_overflow) {
       if (!this.#right_overflow_indicator) {
-        this.#right_overflow_indicator = document.createElement("div");
-        this.#right_overflow_indicator.classList.add(k_overflow_indicator_class_name,
-                                                     k_right_overflow_indicator_class_name);
-        this.#chart_el.append(this.#right_overflow_indicator);
+        this.#right_overflow_indicator = m_utils.create_el("div", {
+          parent: this.#display_layer_el,
+          classes: [k_overflow_indicator_class_name, k_right_overflow_indicator_class_name],
+        });
       }
     } else {
       if (this.#right_overflow_indicator) {
@@ -1149,6 +1174,19 @@ export class StarChart {
     }
     return bound_box_contains(box, this.#mouse_x, this.#mouse_y);
   }
+
+  async #on_back_button_click() {
+    if (this.#current_waypoint) {
+      await this.#set_location_if_not_busy(e_location_type.waypoint, this.#current_waypoint,
+                                           e_location_view_type.centered_on);
+    } else if (this.#current_system) {
+      await this.#set_location_if_not_busy(
+        e_location_type.system,
+        this.#current_system.system.symbol,
+        e_location_view_type.centered_on
+      );
+    }
+  }
 }
 
 /**
@@ -1179,6 +1217,8 @@ function bound_box_contains(box, x, y) {
  *
  * @returns
  *    Return value matches that of `StarChart.until_close`.
+ *
+ * TODO: This needs testing
  */
 export async function popup(
   selection_type, auth_token, initial_location_type = null, initial_location = null,
