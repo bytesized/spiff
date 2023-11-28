@@ -100,10 +100,29 @@ export class StarChart {
   #overlay_layer_el;
   #display_layer_el;
 
-  // If non-`null`, matches the `result.waypoints` format of the `server/star_chart/waypoints` and
+  // If non-`null`, matches the `result` format of the `server/star_chart/local_systems` local API
+  // endpoint.
+  #local_universe = null; // TODO
+  // If non-`null`, matches the `result` format of the `server/star_chart/waypoints` and
   // `server/star_chart/sibling_waypoints` local API endpoints. If `null`, we are viewing the
   // universe chart.
-  // Waypoints may have additional keys including:
+  #current_system = null;
+  // If non-`null`, will be the symbol of a waypoint in `#current_system`. This will represent the
+  // waypoint that we are viewing the orbitals of. If `null`, we are viewing the entire system or
+  // the universe chart.
+  // Will never be non-`null` while `#current_system` is `null`.
+  #current_waypoint = null;
+
+  // `#loaded_locations` will always be an object containing entries corresponding to locations
+  // (system or waypoint). The entries are populated lazily as they are rendered. If
+  // `#current_system` is `null` (we are displaying the whole universe), entries will be removed
+  // when they are too far outside of the current view in order to keep us from ever having the
+  // whole universe loaded into this variable at once. If `#current_system` is non-`null` (we are
+  // displaying a system or the orbitals of a waypoint), entries won't be removed until we the view
+  // navigates away from the current system.
+  //
+  // Each entry will use the system/waypoint symbol as a key. The value will be an object that may
+  // contain these keys:
   //   connect_tooltip_show_listener
   //     Connects an event listener so that the tooltip is shown on waypoint mouseover.
   //   disconnect_tooltip_show_listener
@@ -128,22 +147,30 @@ export class StarChart {
   //     Will be present if the star chart is displaying the orbitals of a waypoint and this
   //     waypoint is one of the orbitals. Will be an integer indicating the sorted position of the
   //     orbital relative to the other orbitals. May contain stale data if `!rendered`.
+  //   position
+  //     Always present. Will be a reference to the `position` object in the corresponding entry in
+  //     `#current_system.waypoints` or `#local_universe`.
   //   rendered
-  //     Will be `true` if the waypoint is currently rendered. May not be present or may be `false`
-  //     if the waypoint has not been rendered.
+  //     Always present. Will be `true` if the waypoint is currently rendered.
   //   tooltip_el
   //     Will be present if the waypoint is currently rendered. Will be the DOM element
   //     representing the tooltip for the waypoint
   //   tooltip_show_fn
   //     Will be present if the waypoint is currently rendered. Will be a function taking no
   //     arguments that, when called, renders the waypoint's tooltip.
-  #current_system = null;
-  // If non-`null`, will be the symbol of a waypoint in `#current_system`. This will represent the
-  // waypoint that we are viewing the orbitals of. If `null`, we are viewing the entire system or
-  // the universe chat.
-  #current_waypoint = null;
-  // If non-`null`, a tooltip is currently being shown for the waypoint indicated.
-  #active_tooltip_waypoint = null;
+  //   symbol
+  //     Always present. Matches the key for the entry.
+  #loaded_locations = {};
+
+  // Only one tooltip is added to the DOM at a time since we need to properly size and position the
+  // tooltip each time, there is no reason to put them all in the DOM at once. When a tooltip has
+  // been added to the DOM, this variable will be the symbol of the location that the tooltip
+  // belongs to. When the tooltip is removed from the DOM, this will be set back to `null`.
+  #active_tooltip_location = null;
+  // If non-`null`, matches the `result` format of the `server/star_chart/universe_bounds` local
+  // API endpoint. Will not be `null` if the universe map has ever been displayed.
+  #universe_bounds = null;
+
   #destroyed = false;
   #resize_observer = null;
   #selection_type;
@@ -196,9 +223,9 @@ export class StarChart {
    *        called successfully.
    * @param initial_location_type
    *        Should be a value from `e_location_type` indicating what type of location was provided
-   *        for `initial_location`. If this is `e_location_type.system`, the star chart will start in
-   *        the system view. If it is `e_location_type.waypoint`, the star chart will start zoomed 
-   *        into the relevant system, but the user can back out to see the system view.
+   *        for `initial_location`. If this is `e_location_type.system`, the star chart will start
+   *        in the system view. If it is `e_location_type.waypoint`, the star chart will start
+   *        zoomed into the relevant system, but the user can back out to see the system view.
    *        This can also be not specified or `null`, in which case the chart will just display as
    *        loading until `set_location` is called. If this is `null`, `initial_location` and
    *        `location_view_type` should also be `null`.
@@ -213,7 +240,7 @@ export class StarChart {
    *        `null`, in which case the chart will just display as loading until `set_location` is
    *        called. If this is `null`, `initial_location_type` and `initial_location` should also
    *        be `null`.
-   * TODO: Add argument/method to allow certain waypoints/systems to be recolored.
+   * TODO: Add argument/method to allow certain waypoints/systems to be recolored/marked.
    */
   constructor(
     selection_type, active = e_activation.active, auth_token = null,
@@ -282,8 +309,9 @@ export class StarChart {
       if (event.wheelDeltaY == 0 || !this.usable || this.#current_waypoint) {
         return;
       }
-      if (this.#active_tooltip_waypoint) {
-        const tooltip_bound_box = this.#active_tooltip_waypoint.tooltip_el.getBoundingClientRect();
+      if (this.#active_tooltip_location) {
+        const tooltip_bound_box =
+          this.#loaded_locations[this.#active_tooltip_location].tooltip_el.getBoundingClientRect();
         if (this.#bound_box_contains_mouse(tooltip_bound_box)) {
           return;
         }
@@ -435,6 +463,14 @@ export class StarChart {
         // We are loading the universe map not a system map.
         this.#current_system = null;
         this.#current_waypoint = null;
+
+        if (!this.#universe_bounds) {
+          const response = await m_server.star_chart.universe_bounds();
+          k_log.raise_if(!response.success, "Failed to get universe bounds from server:",
+                         response.error_message);
+          this.#universe_bounds = response.result;
+        }
+
         // TODO: Load and render universe data
         throw new Error("Not yet implemented");
       } else if (type == e_location_type.system) { // Zoomed into system
@@ -606,13 +642,12 @@ export class StarChart {
   /**
    * This function should only be used for the initial render.
    *
-   * If not rendering the universe, waypoint data for the system must already be loaded.
+   * If displaying a system or waypoint orbitals, the waypoint data for the system must already be
+   * loaded.
    */
   #chart_initial_render() {
     this.#reset_chart_el();
-    for (const symbol in this.#current_system.waypoints) {
-      this.#current_system.waypoints[symbol].rendered = false;
-    }
+    this.#loaded_locations = {};
 
     const back_button_background = m_utils.create_el("div", {
       parent: this.#overlay_layer_el,
@@ -660,15 +695,28 @@ export class StarChart {
    *        unspecified, it will be as if the cursor is in the center of the map.
    */
   #chart_rerender(reason, {zoom_by, zoom_center_x, zoom_center_y} = {}) {
-    const waypoints = [];
+    // Set `locations` to the `#loaded_locations` values for all loaded locations that could be
+    // rendered in the current view (not just what is going to be displayed).
+    const locations = [];
     for (const symbol in this.#current_system.waypoints) {
       const waypoint = this.#current_system.waypoints[symbol];
       if (waypoint.orbits == this.#current_waypoint || symbol == this.#current_waypoint) {
-        waypoints.push(waypoint);
+        if (!(symbol in this.#loaded_locations)) {
+          this.#loaded_locations[symbol] = {
+            symbol,
+            position: waypoint.position,
+            rendered: false,
+          };
+        }
+        locations.push(this.#loaded_locations[symbol]);
       }
     }
     if (this.#current_waypoint) {
-      waypoints.sort((a, b) => {
+      // When viewing the orbitals of a waypoint, there are not well defined positions to display
+      // the orbitals at, so we pick fairly arbitrary positions based on their `index` value which
+      // loosely corresponds to their ordering in the `locations` array. Make sure that ordering is
+      // stable so that the orbital map displays the same way each time.
+      locations.sort((a, b) => {
         if (a.symbol == b.symbol) {
           return 0;
         }
@@ -678,9 +726,9 @@ export class StarChart {
         return 1;
       });
       let index = 0;
-      for (const waypoint of waypoints) {
-        if (waypoint.symbol != this.#current_waypoint) {
-          waypoint.index = index;
+      for (const location of locations) {
+        if (location.symbol != this.#current_waypoint) {
+          location.index = index;
           index += 1;
         }
       }
@@ -688,16 +736,18 @@ export class StarChart {
 
     const chart_bound_box = this.#chart_el.getBoundingClientRect();
 
-    if (chart_bound_box.width == 0 || chart_bound_box.height == 0 || waypoints.length < 1) {
+    // Past this point, we want to be able to assume that the size of the display is not 0 and the
+    // number of things we are going to display in it is not 0.
+    if (chart_bound_box.width == 0 || chart_bound_box.height == 0 || locations.length < 1) {
       this.#display_layer_el.replaceChildren();
-      for (const symbol in this.#current_system.waypoints) {
-        this.#current_system.waypoints[symbol].rendered = false;
+      for (const symbol in this.#loaded_locations) {
+        this.#loaded_locations[symbol].rendered = false;
       }
       return;
     }
 
     if (this.#current_waypoint) {
-      // When viewing the orbitals of a waypoint, they all have the same coordinates, so defining
+      // When viewing the orbitals of a waypoint, they all have the same coordinates. So defining
       // view bounds isn't really meaningful.
       this.#min_x = null;
       this.#max_x = null;
@@ -705,26 +755,26 @@ export class StarChart {
       this.#max_y = null;
     }
 
-    const resize_to_fit = !this.#current_waypoint &&
+    const resize_to_fit = this.#current_system && !this.#current_waypoint &&
                           (
                             reason == e_rerender_reason.chart_resize ||
                             this.#min_x == null
                           );
     if (resize_to_fit) {
       // We are going to initially display the system to fit the chart.
-      this.#min_x = waypoints.reduce(
+      this.#min_x = locations.reduce(
         (acc, curr) => curr.position.x < acc ? curr.position.x : acc,
         Infinity
       );
-      this.#max_x = waypoints.reduce(
+      this.#max_x = locations.reduce(
         (acc, curr) => curr.position.x > acc ? curr.position.x : acc,
         -Infinity
       );
-      this.#min_y = waypoints.reduce(
+      this.#min_y = locations.reduce(
         (acc, curr) => curr.position.y < acc ? curr.position.y : acc,
         Infinity
       );
-      this.#max_y = waypoints.reduce(
+      this.#max_y = locations.reduce(
         (acc, curr) => curr.position.y > acc ? curr.position.y : acc,
         -Infinity
       );
@@ -740,27 +790,27 @@ export class StarChart {
       pixels_per_coord = Math.min(chart_bound_box.width / x_span, chart_bound_box.height / y_span);
     }
 
-    let waypoint_content_size;
-    let waypoint_padding_width;
-    let waypoint_border_width;
-    let waypoint_total_size;
-    let waypoint_total_size_halved;
-    const update_waypoint_size = () => {
-      waypoint_content_size = k_waypoint_image_base_size * pixels_per_coord;
-      waypoint_padding_width = k_waypoint_padding_base_width * pixels_per_coord;
-      waypoint_border_width = k_waypoint_border_base_width * pixels_per_coord;
-      waypoint_total_size =
-        waypoint_content_size + (waypoint_padding_width * 2) + (waypoint_border_width * 2);
-      waypoint_total_size_halved = waypoint_total_size / 2;
+    let location_content_size;
+    let location_padding_width;
+    let location_border_width;
+    let location_total_size;
+    let location_total_size_halved;
+    const update_location_size = () => {
+      location_content_size = k_waypoint_image_base_size * pixels_per_coord;
+      location_padding_width = k_waypoint_padding_base_width * pixels_per_coord;
+      location_border_width = k_waypoint_border_base_width * pixels_per_coord;
+      location_total_size =
+        location_content_size + (location_padding_width * 2) + (location_border_width * 2);
+      location_total_size_halved = location_total_size / 2;
     };
 
     if (resize_to_fit) {
       // The extra space we reserve for the waypoint element overestimates slightly because the
       // waypoint element size needs to be recalculated after we effectively zoom out slightly to
       // add padding. But this would be more effort to correct than I care to put in.
-      update_waypoint_size();
+      update_location_size();
 
-      const buffer = ((waypoint_total_size_halved + k_system_edge_buffer_px) / pixels_per_coord);
+      const buffer = ((location_total_size_halved + k_system_edge_buffer_px) / pixels_per_coord);
       this.#min_x -= buffer;
       this.#max_x += buffer;
       this.#min_y -= buffer;
@@ -844,92 +894,97 @@ export class StarChart {
     let left_overflow = false;
     let right_overflow = false;
 
-    for (const waypoint of waypoints) {
+    for (const location of locations) {
       let should_render = true;
       if (!this.#current_waypoint) {
-        if (waypoint.position.x < this.#min_x) {
+        if (location.position.x < this.#min_x) {
           should_render = false;
           left_overflow = true;
-        } else if (waypoint.position.x > this.#max_x) {
+        } else if (location.position.x > this.#max_x) {
           should_render = false;
           right_overflow = true;
         }
-        if (waypoint.position.y < this.#min_y) {
+        if (location.position.y < this.#min_y) {
           should_render = false;
           lower_overflow = true;
-        } else if (waypoint.position.y > this.#max_y) {
+        } else if (location.position.y > this.#max_y) {
           should_render = false;
           upper_overflow = true;
         }
       }
 
       if (should_render) {
-        if (waypoint.rendered) {
-          to_move.push(waypoint);
+        if (location.rendered) {
+          to_move.push(location);
         } else {
-          to_render.push(waypoint);
+          to_render.push(location);
         }
       } else {
-        if (waypoint.rendered) {
-          to_unrender.push(waypoint);
+        if (location.rendered) {
+          to_unrender.push(location);
         }
       }
     }
 
-    update_waypoint_size();
+    update_location_size();
     let display_x;
     let display_y;
     if (this.#current_waypoint) {
-      const angular_spacing = 2 * Math.PI / (waypoints.length - 1);
+      const angular_spacing = 2 * Math.PI / (locations.length - 1);
       const orbit_distance = (Math.min(chart_bound_box.width, chart_bound_box.height) / 2) -
                              k_system_edge_buffer_px;
       const center_x = chart_bound_box.width / 2;
       const center_y = chart_bound_box.height / 2;
-      display_x = waypoint => {
-        if (waypoint.symbol == this.#current_waypoint) {
-          return center_x - waypoint_total_size_halved;
+      display_x = location => {
+        if (location.symbol == this.#current_waypoint) {
+          return center_x - location_total_size_halved;
         }
         return (
           center_x +
-          (Math.cos(angular_spacing * waypoint.index) * orbit_distance) -
-          waypoint_total_size_halved
+          (Math.cos(angular_spacing * location.index) * orbit_distance) -
+          location_total_size_halved
         );
       };
-      display_y = waypoint => {
-        if (waypoint.symbol == this.#current_waypoint) {
-          return center_y - waypoint_total_size_halved;
+      display_y = location => {
+        if (location.symbol == this.#current_waypoint) {
+          return center_y - location_total_size_halved;
         }
         return (
           center_y +
-          (Math.sin(angular_spacing * waypoint.index) * orbit_distance) -
-          waypoint_total_size_halved
+          (Math.sin(angular_spacing * location.index) * orbit_distance) -
+          location_total_size_halved
         );
       };
     } else {
-      display_x = waypoint =>
-        (chart_bound_box.width * (waypoint.position.x - this.#min_x) / x_span) -
-        waypoint_total_size_halved;
-      display_y = waypoint =>
-        (chart_bound_box.height * (waypoint.position.y - this.#min_y) / y_span) -
-        waypoint_total_size_halved;
+      display_x = location =>
+        (chart_bound_box.width * (location.position.x - this.#min_x) / x_span) -
+        location_total_size_halved;
+      display_y = location =>
+        (chart_bound_box.height * (location.position.y - this.#min_y) / y_span) -
+        location_total_size_halved;
     }
 
-    for (const waypoint of to_render) {
-      if (!waypoint.el) {
-        waypoint.el = m_utils.create_el("div", {classes: [k_location_class_name]});
+    for (const location of to_render) {
+      const waypoint = this.#current_system.waypoints[location.symbol];
 
-        waypoint.icon_el =
-          m_utils.create_el("div", {parent: waypoint.el, classes: [k_location_icon_class_name]});
-        waypoint.icon_el.setAttribute(k_location_symbol_attr, waypoint.symbol);
-        waypoint.icon_el.style["background-image"] =
+      if (!location.el) {
+        location.el = m_utils.create_el("div", {classes: [k_location_class_name]});
+
+        location.icon_el =
+          m_utils.create_el("div", {parent: location.el, classes: [k_location_icon_class_name]});
+        location.icon_el.setAttribute(k_location_symbol_attr, location.symbol);
+        location.icon_el.style["background-image"] =
           "url(\"/client/img/star_chart/waypoint/fallback.svg\")";
-        waypoint.icon_el.style.padding = `${waypoint_padding_width}px`;
-        waypoint.icon_el.style["border-width"] = `${waypoint_border_width}px`;
+        location.icon_el.style.padding = `${location_padding_width}px`;
+        location.icon_el.style["border-width"] = `${location_border_width}px`;
 
-        waypoint.tooltip_el = m_utils.create_el("div", {classes: [k_tooltip_class_name]});
-        m_utils.create_el("h1", {parent: waypoint.tooltip_el, text: waypoint.symbol});
+        // TODO: Add line to tooltip if this is the headquarters.
+        // TODO: Add ship count to tooltip.
+
+        location.tooltip_el = m_utils.create_el("div", {classes: [k_tooltip_class_name]});
+        m_utils.create_el("h1", {parent: location.tooltip_el, text: waypoint.symbol});
         const tooltip_list_el = m_utils.create_el("ul", {
-          parent: waypoint.tooltip_el,
+          parent: location.tooltip_el,
           classes: [k_tooltip_data_list_class_name],
         });
         m_utils.create_el("li", {
@@ -952,7 +1007,7 @@ export class StarChart {
         }
         const trait_click_handler = ({list, item, id}) => {
           item.classList.toggle(k_tooltip_expanded_trait_class_name);
-          this.#position_size_and_show_tooltip(waypoint);
+          this.#position_size_and_show_tooltip(waypoint.symbol);
         };
         const trait_list = m_list.create_selectable(traits, trait_click_handler);
         traits_li.append(trait_list);
@@ -965,15 +1020,15 @@ export class StarChart {
           }
         }
 
-        waypoint.tooltip_show_fn = () => this.#position_size_and_show_tooltip(waypoint);
-        waypoint.connect_tooltip_show_listener = () => {
-          waypoint.el.addEventListener("mouseenter", waypoint.tooltip_show_fn);
+        location.tooltip_show_fn = () => this.#position_size_and_show_tooltip(location.symbol);
+        location.connect_tooltip_show_listener = () => {
+          location.el.addEventListener("mouseenter", location.tooltip_show_fn);
         };
-        waypoint.disconnect_tooltip_show_listener = () => {
-          waypoint.el.removeEventListener("mouseenter", waypoint.tooltip_show_fn);
+        location.disconnect_tooltip_show_listener = () => {
+          location.el.removeEventListener("mouseenter", location.tooltip_show_fn);
         };
 
-        waypoint.el.addEventListener("click", async () => {
+        location.el.addEventListener("click", async () => {
           if (waypoint.orbitals.length) {
             await this.#set_location_if_not_busy(e_location_type.waypoint, waypoint.symbol,
                                                  e_location_view_type.zoomed_in_to);
@@ -986,72 +1041,72 @@ export class StarChart {
         });
 
         if (waypoint.orbitals.length) {
-          waypoint.el.classList.add(k_orbited_location_class_name);
+          location.el.classList.add(k_orbited_location_class_name);
         }
       }
 
       if (this.#selection_type == e_selection_type.waypoint ||
           (waypoint.orbitals.length && !this.#current_waypoint)) {
-        waypoint.el.classList.add(k_clickable_location_class_name);
+        location.el.classList.add(k_clickable_location_class_name);
       } else {
-        waypoint.el.classList.remove(k_clickable_location_class_name);
+        location.el.classList.remove(k_clickable_location_class_name);
       }
 
-      waypoint.el_size = waypoint_total_size;
-      waypoint.el_x = display_x(waypoint);
-      waypoint.el_y = display_y(waypoint);
-      waypoint.el.style.width = `${waypoint_total_size}px`;
-      waypoint.el.style.height = `${waypoint_total_size}px`;
-      waypoint.el.style.left = `${waypoint.el_x}px`;
-      waypoint.el.style.bottom = `${waypoint.el_y}px`;
+      location.el_size = location_total_size;
+      location.el_x = display_x(location);
+      location.el_y = display_y(location);
+      location.el.style.width = `${location_total_size}px`;
+      location.el.style.height = `${location_total_size}px`;
+      location.el.style.left = `${location.el_x}px`;
+      location.el.style.bottom = `${location.el_y}px`;
 
-      this.#display_layer_el.append(waypoint.el);
-      waypoint.connect_tooltip_show_listener();
-      waypoint.rendered = true;
+      this.#display_layer_el.append(location.el);
+      location.connect_tooltip_show_listener();
+      location.rendered = true;
     }
 
-    for (const waypoint of to_move) {
-      waypoint.el_x = display_x(waypoint);
-      waypoint.el_y = display_y(waypoint);
-      waypoint.el_size = waypoint_total_size;
-      waypoint.el.style.left = `${waypoint.el_x}px`;
-      waypoint.el.style.bottom = `${waypoint.el_y}px`;
-      waypoint.el.style.width = `${waypoint_total_size}px`;
-      waypoint.el.style.height = `${waypoint_total_size}px`;
-      waypoint.icon_el.style.padding = `${waypoint_padding_width}px`;
-      waypoint.icon_el.style["border-width"] = `${waypoint_border_width}px`;
+    for (const location of to_move) {
+      location.el_x = display_x(location);
+      location.el_y = display_y(location);
+      location.el_size = location_total_size;
+      location.el.style.left = `${location.el_x}px`;
+      location.el.style.bottom = `${location.el_y}px`;
+      location.el.style.width = `${location_total_size}px`;
+      location.el.style.height = `${location_total_size}px`;
+      location.icon_el.style.padding = `${location_padding_width}px`;
+      location.icon_el.style["border-width"] = `${location_border_width}px`;
     }
 
-    for (const waypoint of to_unrender) {
-      waypoint.el.remove();
-      waypoint.disconnect_tooltip_show_listener();
-      waypoint.rendered = false;
+    for (const location of to_unrender) {
+      location.el.remove();
+      location.disconnect_tooltip_show_listener();
+      location.rendered = false;
     }
 
     // If there is a tooltip already showing, we may need to adjust it, otherwise its sizing may be
     // wrong for the current window size.
     let tooltip_adjusted = false;
-    if (this.#active_tooltip_waypoint) {
-      const tooltip_bound_box = this.#active_tooltip_waypoint.tooltip_el.getBoundingClientRect();
+    if (this.#active_tooltip_location) {
+      const tooltip_bound_box =
+        this.#loaded_locations[this.#active_tooltip_location].tooltip_el.getBoundingClientRect();
       if (this.#bound_box_contains_mouse(tooltip_bound_box)) {
-        this.#position_size_and_show_tooltip(this.#active_tooltip_waypoint);
+        this.#position_size_and_show_tooltip(this.#active_tooltip_location);
         tooltip_adjusted = true;
       }
     }
     if (!tooltip_adjusted) {
       const visible = to_render.concat(to_move);
-      let waypoint_with_tooltip;
-      for (const waypoint of visible) {
-        const waypoint_bound_box = waypoint.el.getBoundingClientRect();
-        if (this.#bound_box_contains_mouse(waypoint_bound_box)) {
-          this.#position_size_and_show_tooltip(waypoint);
+      for (const location of visible) {
+        const location_bound_box = location.el.getBoundingClientRect();
+        if (this.#bound_box_contains_mouse(location_bound_box)) {
+          this.#position_size_and_show_tooltip(location.symbol);
           tooltip_adjusted = true;
           break;
         }
       }
     }
     if (!tooltip_adjusted) {
-      // We aren't over the tooltip or a waypoint. Make sure the waypoint is hidden.
+      // We aren't over the tooltip or a location. Make sure the tooltip is hidden.
       this.#remove_current_tooltip();
     }
 
@@ -1109,57 +1164,59 @@ export class StarChart {
     }
   }
 
-  #position_size_and_show_tooltip(waypoint) {
-    if (this.#active_tooltip_waypoint != waypoint) {
-      if (this.#active_tooltip_waypoint) {
+  #position_size_and_show_tooltip(symbol) {
+    const location = this.#loaded_locations[symbol];
+    if (this.#active_tooltip_location != symbol) {
+      if (this.#active_tooltip_location) {
         this.#remove_current_tooltip();
       }
-      this.#active_tooltip_waypoint = waypoint;
+      this.#active_tooltip_location = symbol;
 
-      waypoint.el.append(waypoint.tooltip_el);
-      waypoint.tooltip_el.style.width = `${k_tooltip_width_px}px`;
+      location.el.append(location.tooltip_el);
+      location.tooltip_el.style.width = `${k_tooltip_width_px}px`;
     }
 
     // Reset the way we displayed it last time
-    waypoint.tooltip_el.style.overflow = "visible";
-    waypoint.tooltip_el.style.top = "auto";
-    waypoint.tooltip_el.style.bottom = "auto";
-    waypoint.tooltip_el.style.left = "auto";
-    waypoint.tooltip_el.style.right = "auto";
+    location.tooltip_el.style.overflow = "visible";
+    location.tooltip_el.style.top = "auto";
+    location.tooltip_el.style.bottom = "auto";
+    location.tooltip_el.style.left = "auto";
+    location.tooltip_el.style.right = "auto";
 
     // -1 to make sure there is at least a little overlap
-    waypoint.tooltip_el.style.left = `${waypoint.el_size - 1}px`;
-    waypoint.tooltip_el.style.bottom = "0";
+    location.tooltip_el.style.left = `${location.el_size - 1}px`;
+    location.tooltip_el.style.bottom = "0";
 
-    let tooltip_bound_box = waypoint.tooltip_el.getBoundingClientRect();
+    let tooltip_bound_box = location.tooltip_el.getBoundingClientRect();
     const chart_bound_box = this.#chart_el.getBoundingClientRect();
     if (chart_bound_box.top > tooltip_bound_box.top) {
-      const waypoint_bound_box = waypoint.el.getBoundingClientRect();
-      waypoint.tooltip_el.style.top = `${chart_bound_box.top - waypoint_bound_box.top}px`;
-      waypoint.tooltip_el.style.bottom = "auto";
-      tooltip_bound_box = waypoint.tooltip_el.getBoundingClientRect();
+      const location_bound_box = location.el.getBoundingClientRect();
+      location.tooltip_el.style.top = `${chart_bound_box.top - location_bound_box.top}px`;
+      location.tooltip_el.style.bottom = "auto";
+      tooltip_bound_box = location.tooltip_el.getBoundingClientRect();
       if (chart_bound_box.bottom < tooltip_bound_box.bottom) {
-        waypoint.tooltip_el.style.bottom =
-          `${waypoint_bound_box.bottom - chart_bound_box.bottom}px`;
-        waypoint.tooltip_el.style.overflow = "scroll";
+        location.tooltip_el.style.bottom =
+          `${location_bound_box.bottom - chart_bound_box.bottom}px`;
+        location.tooltip_el.style.overflow = "scroll";
       }
     }
 
     if (chart_bound_box.right < tooltip_bound_box.right) {
-      waypoint.tooltip_el.style.left = "auto";
-      waypoint.tooltip_el.style.right = `${waypoint.el_size}px`;
+      location.tooltip_el.style.left = "auto";
+      location.tooltip_el.style.right = `${location.el_size}px`;
     }
   }
 
   #remove_current_tooltip() {
-    if (!this.#active_tooltip_waypoint) {
+    if (!this.#active_tooltip_location) {
       return;
     }
 
-    this.#active_tooltip_waypoint.connect_tooltip_show_listener();
-    this.#active_tooltip_waypoint.tooltip_el.remove();
+    const location = this.#loaded_locations[this.#active_tooltip_location];
+    location.connect_tooltip_show_listener();
+    location.tooltip_el.remove();
 
-    this.#active_tooltip_waypoint = null;
+    this.#active_tooltip_location = null;
   }
 
   /**
