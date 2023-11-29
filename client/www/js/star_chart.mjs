@@ -79,8 +79,6 @@ const k_waypoint_border_base_width = 0.2;
 const k_waypoint_image_base_size = 20;
 const k_waypoint_padding_base_width = 3;
 
-let g_next_chart_id = 0;
-
 /**
  * Renders the star chart into the specified parent element. Once the class's work is complete
  * (`cancel()` has been called, a selection has been made, a server reset occurs), the class 
@@ -90,7 +88,6 @@ let g_next_chart_id = 0;
 export class StarChart {
   #active = e_activation.inactive;
   #auth_token;
-  #chart_id;
   #close_resolve_fn;
   #close_promise;
   #navigation_callbacks = null;
@@ -246,9 +243,6 @@ export class StarChart {
     selection_type, active = e_activation.active, auth_token = null,
     initial_location_type = null, initial_location = null, location_view_type = null
   ) {
-    this.#chart_id = g_next_chart_id;
-    g_next_chart_id += 1;
-
     this.#selection_type = selection_type;
 
     this.#close_promise = new Promise(resolve => {this.#close_resolve_fn = resolve})
