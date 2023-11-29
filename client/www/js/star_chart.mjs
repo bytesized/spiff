@@ -29,6 +29,12 @@ export const e_location_type = Object.freeze({
   waypoint: "e_location_type::waypoint",
 });
 
+const e_chart_type = Object.freeze({
+  universe: "e_chart_type::universe",
+  system: "e_chart_type::system",
+  orbitals: "e_chart_type::orbitals",
+});
+
 export const e_chart_close_reason = Object.freeze({
   selection: "e_chart_close_reason::selection",
   cancelled: "e_chart_close_reason::cancelled",
@@ -97,26 +103,28 @@ export class StarChart {
   #overlay_layer_el;
   #display_layer_el;
 
+  // Will be a value of `e_chart_type` once something is showing.
+  #displaying = null;
+
   // If non-`null`, matches the `result` format of the `server/star_chart/local_systems` local API
   // endpoint.
   #local_universe = null; // TODO
   // If non-`null`, matches the `result` format of the `server/star_chart/waypoints` and
-  // `server/star_chart/sibling_waypoints` local API endpoints. If `null`, we are viewing the
-  // universe chart.
+  // `server/star_chart/sibling_waypoints` local API endpoints.
   #current_system = null;
   // If non-`null`, will be the symbol of a waypoint in `#current_system`. This will represent the
-  // waypoint that we are viewing the orbitals of. If `null`, we are viewing the entire system or
-  // the universe chart.
+  // waypoint that we are viewing the orbitals of. May be `null` if we are viewing the entire
+  // system or the universe chart.
   // Will never be non-`null` while `#current_system` is `null`.
   #current_waypoint = null;
 
   // `#loaded_locations` will always be an object containing entries corresponding to locations
-  // (system or waypoint). The entries are populated lazily as they are rendered. If
-  // `#current_system` is `null` (we are displaying the whole universe), entries will be removed
-  // when they are too far outside of the current view in order to keep us from ever having the
-  // whole universe loaded into this variable at once. If `#current_system` is non-`null` (we are
-  // displaying a system or the orbitals of a waypoint), entries won't be removed until we the view
-  // navigates away from the current system.
+  // (system or waypoint). The entries are pre-populated into the list during
+  // `#chart_initial_render`, but will not have all their keys yet. If we are displaying the whole
+  // universe, entries will be removed when they are too far outside of the current view in order
+  // to keep us from ever having the whole universe loaded into this variable at once. If we are
+  // displaying a system or waypoint orbitals, entries won't be removed until we the view navigates
+  // away from the current system.
   //
   // Each entry will use the system/waypoint symbol as a key. The value will be an object that may
   // contain these keys:
@@ -144,8 +152,9 @@ export class StarChart {
   //     Will be present if the star chart is displaying the orbitals of a waypoint and this
   //     waypoint is one of the orbitals. Will be an integer indicating the sorted position of the
   //     orbital relative to the other orbitals. May contain stale data if `!rendered`.
+  //     This must be stable in order to make orbital chart position stable across data loads.
   //   position
-  //     Always present. Will be a reference to the `position` object in the corresponding entry in
+  //     Always present. Will be a copy of the `position` object in the corresponding entry in
   //     `#current_system.waypoints` or `#local_universe`.
   //   rendered
   //     Always present. Will be `true` if the waypoint is currently rendered.
@@ -163,7 +172,7 @@ export class StarChart {
   // tooltip each time, there is no reason to put them all in the DOM at once. When a tooltip has
   // been added to the DOM, this variable will be the symbol of the location that the tooltip
   // belongs to. When the tooltip is removed from the DOM, this will be set back to `null`.
-  #active_tooltip_location = null;
+  #tooltip_location = null;
   // If non-`null`, matches the `result` format of the `server/star_chart/universe_bounds` local
   // API endpoint. Will not be `null` if the universe map has ever been displayed.
   #universe_bounds = null;
@@ -300,12 +309,12 @@ export class StarChart {
     // available when we want to zoom towards where the mouse is.
     this.#chart_el.addEventListener("mousemove", this.#on_mouse_move.bind(this));
     this.#chart_el.addEventListener("wheel", event => {
-      if (event.wheelDeltaY == 0 || !this.usable || this.#current_waypoint) {
+      if (event.wheelDeltaY == 0 || !this.usable || this.#displaying == e_chart_type.orbitals) {
         return;
       }
-      if (this.#active_tooltip_location) {
+      if (this.#tooltip_location != null) {
         const tooltip_bound_box =
-          this.#loaded_locations[this.#active_tooltip_location].tooltip_el.getBoundingClientRect();
+          this.#loaded_locations[this.#tooltip_location].tooltip_el.getBoundingClientRect();
         if (this.#bound_box_contains_mouse(tooltip_bound_box)) {
           return;
         }
@@ -453,21 +462,8 @@ export class StarChart {
         return;
       }
 
-      if (type == e_location_type.system && view == e_location_view_type.centered_on) {
-        // We are loading the universe map not a system map.
-        this.#current_system = null;
+      if (type == e_location_type.system) {
         this.#current_waypoint = null;
-
-        if (!this.#universe_bounds) {
-          const response = await m_server.star_chart.universe_bounds();
-          k_log.raise_if(!response.success, "Failed to get universe bounds from server:",
-                         response.error_message);
-          this.#universe_bounds = response.result;
-        }
-
-        // TODO: Load and render universe data
-        throw new Error("Not yet implemented");
-      } else if (type == e_location_type.system) { // Zoomed into system
         if (!this.#current_system || symbol != this.#current_system.system.symbol) {
           k_log.raise_if(!this.#auth_token, "Missing authentication token");
           const response = await m_server.star_chart.waypoints(this.#auth_token, symbol);
@@ -475,7 +471,22 @@ export class StarChart {
                          response.error_message);
           this.#current_system = response.result;
         }
-        this.#current_waypoint = null;
+
+        if (view == e_location_view_type.zoomed_in_to) {
+          this.#displaying = e_chart_type.system;
+        } else {
+          this.#displaying = e_chart_type.universe;
+
+          if (!this.#universe_bounds) {
+            const response = await m_server.star_chart.universe_bounds();
+            k_log.raise_if(!response.success, "Failed to get universe bounds from server:",
+                           response.error_message);
+            this.#universe_bounds = response.result;
+          }
+
+          // TODO: Load and render universe data
+          throw new Error("Not yet implemented");
+        }
       } else { // type == e_location_type.waypoint
         if (!this.#current_system || !(symbol in this.#current_system.waypoints)) {
           k_log.raise_if(!this.#auth_token, "Missing authentication token");
@@ -489,6 +500,11 @@ export class StarChart {
         } else {
           this.#current_waypoint = this.#current_system.waypoints[symbol].orbits;
         }
+        if (this.#current_waypoint) {
+          this.#displaying = e_chart_type.orbitals;
+        } else {
+          this.#displaying = e_chart_type.system;
+        }
       }
 
       if (this.#destroyed) {
@@ -500,6 +516,7 @@ export class StarChart {
 
   #reset_chart_el() {
     this.#destroy_resize_observer();
+    this.#remove_current_tooltip();
     this.#display_layer_el.replaceChildren();
     this.#overlay_layer_el.replaceChildren();
 
@@ -643,17 +660,52 @@ export class StarChart {
     this.#reset_chart_el();
     this.#loaded_locations = {};
 
-    const back_button_background = m_utils.create_el("div", {
-      parent: this.#overlay_layer_el,
-      classes: [k_back_button_background_class_name],
-    });
-    back_button_background.addEventListener("click", this.#on_back_button_click.bind(this));
-    const back_button_image = m_utils.create_el("img", {
-      parent: this.#overlay_layer_el,
-      classes: [k_back_button_image_class_name],
-    });
-    back_button_image.src = "/client/img/back_arrow.svg";
-    back_button_image.addEventListener("click", this.#on_back_button_click.bind(this));
+    if (this.#displaying != e_chart_type.universe) {
+      const back_button_background = m_utils.create_el("div", {
+        parent: this.#overlay_layer_el,
+        classes: [k_back_button_background_class_name],
+      });
+      back_button_background.addEventListener("click", this.#on_back_button_click.bind(this));
+      const back_button_image = m_utils.create_el("img", {
+        parent: this.#overlay_layer_el,
+        classes: [k_back_button_image_class_name],
+      });
+      back_button_image.src = "/client/img/back_arrow.svg";
+      back_button_image.addEventListener("click", this.#on_back_button_click.bind(this));
+
+      for (const symbol in this.#current_system.waypoints) {
+        const waypoint = this.#current_system.waypoints[symbol];
+        if (waypoint.orbits == this.#current_waypoint || symbol == this.#current_waypoint) {
+          this.#loaded_locations[symbol] = {
+            symbol,
+            position: {x: waypoint.position.x, y: waypoint.position.y},
+            rendered: false,
+          };
+        }
+      }
+
+      if (this.#displaying == e_chart_type.orbitals) {
+        // Populate `#loaded_locations`'s `index` property with that will be stable across data
+        // loads.
+        const locations = Object.values(this.#loaded_locations);
+        locations.sort((a, b) => {
+          if (a.symbol == b.symbol) {
+            return 0;
+          }
+          if (a.symbol < b.symbol) {
+            return -1;
+          }
+          return 1;
+        });
+        let index = 0;
+        for (const location of locations) {
+          if (location.symbol != this.#current_waypoint) {
+            location.index = index;
+            index += 1;
+          }
+        }
+      }
+    }
 
     this.#resize_observer = new ResizeObserver(entries => {
       this.#mouse_x = null;
@@ -689,50 +741,12 @@ export class StarChart {
    *        unspecified, it will be as if the cursor is in the center of the map.
    */
   #chart_rerender(reason, {zoom_by, zoom_center_x, zoom_center_y} = {}) {
-    // Set `locations` to the `#loaded_locations` values for all loaded locations that could be
-    // rendered in the current view (not just what is going to be displayed).
-    const locations = [];
-    for (const symbol in this.#current_system.waypoints) {
-      const waypoint = this.#current_system.waypoints[symbol];
-      if (waypoint.orbits == this.#current_waypoint || symbol == this.#current_waypoint) {
-        if (!(symbol in this.#loaded_locations)) {
-          this.#loaded_locations[symbol] = {
-            symbol,
-            position: waypoint.position,
-            rendered: false,
-          };
-        }
-        locations.push(this.#loaded_locations[symbol]);
-      }
-    }
-    if (this.#current_waypoint) {
-      // When viewing the orbitals of a waypoint, there are not well defined positions to display
-      // the orbitals at, so we pick fairly arbitrary positions based on their `index` value which
-      // loosely corresponds to their ordering in the `locations` array. Make sure that ordering is
-      // stable so that the orbital map displays the same way each time.
-      locations.sort((a, b) => {
-        if (a.symbol == b.symbol) {
-          return 0;
-        }
-        if (a.symbol < b.symbol) {
-          return -1;
-        }
-        return 1;
-      });
-      let index = 0;
-      for (const location of locations) {
-        if (location.symbol != this.#current_waypoint) {
-          location.index = index;
-          index += 1;
-        }
-      }
-    }
-
     const chart_bound_box = this.#chart_el.getBoundingClientRect();
 
     // Past this point, we want to be able to assume that the size of the display is not 0 and the
     // number of things we are going to display in it is not 0.
-    if (chart_bound_box.width == 0 || chart_bound_box.height == 0 || locations.length < 1) {
+    if (chart_bound_box.width == 0 || chart_bound_box.height == 0 ||
+        m_utils.object_is_empty(this.#loaded_locations)) {
       this.#display_layer_el.replaceChildren();
       for (const symbol in this.#loaded_locations) {
         this.#loaded_locations[symbol].rendered = false;
@@ -740,7 +754,7 @@ export class StarChart {
       return;
     }
 
-    if (this.#current_waypoint) {
+    if (this.#displaying == e_chart_type.orbitals) {
       // When viewing the orbitals of a waypoint, they all have the same coordinates. So defining
       // view bounds isn't really meaningful.
       this.#min_x = null;
@@ -749,26 +763,27 @@ export class StarChart {
       this.#max_y = null;
     }
 
-    const resize_to_fit = this.#current_system && !this.#current_waypoint &&
-                          (
-                            reason == e_rerender_reason.chart_resize ||
-                            this.#min_x == null
-                          );
+    const resize_to_fit = this.#displaying == e_chart_type.system &&
+      (reason == e_rerender_reason.chart_resize || this.#min_x == null);
     if (resize_to_fit) {
       // We are going to initially display the system to fit the chart.
-      this.#min_x = locations.reduce(
+      this.#min_x = m_utils.object_reduce(
+        this.#loaded_locations,
         (acc, curr) => curr.position.x < acc ? curr.position.x : acc,
         Infinity
       );
-      this.#max_x = locations.reduce(
+      this.#max_x = m_utils.object_reduce(
+        this.#loaded_locations,
         (acc, curr) => curr.position.x > acc ? curr.position.x : acc,
         -Infinity
       );
-      this.#min_y = locations.reduce(
+      this.#min_y = m_utils.object_reduce(
+        this.#loaded_locations,
         (acc, curr) => curr.position.y < acc ? curr.position.y : acc,
         Infinity
       );
-      this.#max_y = locations.reduce(
+      this.#max_y = m_utils.object_reduce(
+        this.#loaded_locations,
         (acc, curr) => curr.position.y > acc ? curr.position.y : acc,
         -Infinity
       );
@@ -778,7 +793,7 @@ export class StarChart {
     let y_span = this.#max_y - this.#min_y;
 
     let pixels_per_coord;
-    if (this.#current_waypoint) {
+    if (this.#displaying == e_chart_type.orbitals) {
       pixels_per_coord = k_orbital_view_pixels_per_coordinate;
     } else {
       pixels_per_coord = Math.min(chart_bound_box.width / x_span, chart_bound_box.height / y_span);
@@ -888,9 +903,10 @@ export class StarChart {
     let left_overflow = false;
     let right_overflow = false;
 
-    for (const location of locations) {
+    for (const symbol in this.#loaded_locations) {
+      const location = this.#loaded_locations[symbol];
       let should_render = true;
-      if (!this.#current_waypoint) {
+      if (this.#displaying != e_chart_type.orbitals) {
         if (location.position.x < this.#min_x) {
           should_render = false;
           left_overflow = true;
@@ -923,8 +939,8 @@ export class StarChart {
     update_location_size();
     let display_x;
     let display_y;
-    if (this.#current_waypoint) {
-      const angular_spacing = 2 * Math.PI / (locations.length - 1);
+    if (this.#displaying == e_chart_type.orbitals) {
+      const angular_spacing = 2 * Math.PI / (m_utils.object_length(this.#loaded_locations) - 1);
       const orbit_distance = (Math.min(chart_bound_box.width, chart_bound_box.height) / 2) -
                              k_system_edge_buffer_px;
       const center_x = chart_bound_box.width / 2;
@@ -1013,6 +1029,9 @@ export class StarChart {
             m_utils.create_el("li", {parent: orbitals_list, text: orbital});
           }
         }
+        location.tooltip_el.addEventListener("click", event => {
+          event.stopPropagation();
+        });
 
         location.tooltip_show_fn = () => this.#position_size_and_show_tooltip(location.symbol);
         location.connect_tooltip_show_listener = () => {
@@ -1023,7 +1042,7 @@ export class StarChart {
         };
 
         location.el.addEventListener("click", async () => {
-          if (waypoint.orbitals.length) {
+          if (this.#displaying == e_chart_type.system && waypoint.orbitals.length) {
             await this.#set_location_if_not_busy(e_location_type.waypoint, waypoint.symbol,
                                                  e_location_view_type.zoomed_in_to);
           } else if (this.#selection_type == e_selection_type.waypoint) {
@@ -1040,7 +1059,7 @@ export class StarChart {
       }
 
       if (this.#selection_type == e_selection_type.waypoint ||
-          (waypoint.orbitals.length && !this.#current_waypoint)) {
+          (waypoint.orbitals.length && this.#displaying != e_chart_type.orbitals)) {
         location.el.classList.add(k_clickable_location_class_name);
       } else {
         location.el.classList.remove(k_clickable_location_class_name);
@@ -1080,11 +1099,11 @@ export class StarChart {
     // If there is a tooltip already showing, we may need to adjust it, otherwise its sizing may be
     // wrong for the current window size.
     let tooltip_adjusted = false;
-    if (this.#active_tooltip_location) {
+    if (this.#tooltip_location != null) {
       const tooltip_bound_box =
-        this.#loaded_locations[this.#active_tooltip_location].tooltip_el.getBoundingClientRect();
+        this.#loaded_locations[this.#tooltip_location].tooltip_el.getBoundingClientRect();
       if (this.#bound_box_contains_mouse(tooltip_bound_box)) {
-        this.#position_size_and_show_tooltip(this.#active_tooltip_location);
+        this.#position_size_and_show_tooltip(this.#tooltip_location);
         tooltip_adjusted = true;
       }
     }
@@ -1160,11 +1179,9 @@ export class StarChart {
 
   #position_size_and_show_tooltip(symbol) {
     const location = this.#loaded_locations[symbol];
-    if (this.#active_tooltip_location != symbol) {
-      if (this.#active_tooltip_location) {
-        this.#remove_current_tooltip();
-      }
-      this.#active_tooltip_location = symbol;
+    if (this.#tooltip_location != symbol) {
+      this.#remove_current_tooltip();
+      this.#tooltip_location = symbol;
 
       location.el.append(location.tooltip_el);
       location.tooltip_el.style.width = `${k_tooltip_width_px}px`;
@@ -1202,15 +1219,15 @@ export class StarChart {
   }
 
   #remove_current_tooltip() {
-    if (!this.#active_tooltip_location) {
+    if (this.#tooltip_location == null) {
       return;
     }
 
-    const location = this.#loaded_locations[this.#active_tooltip_location];
+    const location = this.#loaded_locations[this.#tooltip_location];
     location.connect_tooltip_show_listener();
     location.tooltip_el.remove();
 
-    this.#active_tooltip_location = null;
+    this.#tooltip_location = null;
   }
 
   /**
@@ -1223,14 +1240,14 @@ export class StarChart {
     if (this.#mouse_x == null || this.#mouse_y == null) {
       return false;
     }
-    return bound_box_contains(box, this.#mouse_x, this.#mouse_y);
+    return m_utils.bound_box_contains(box, this.#mouse_x, this.#mouse_y);
   }
 
   async #on_back_button_click() {
-    if (this.#current_waypoint) {
+    if (this.#displaying == e_chart_type.orbitals) {
       await this.#set_location_if_not_busy(e_location_type.waypoint, this.#current_waypoint,
                                            e_location_view_type.centered_on);
-    } else if (this.#current_system) {
+    } else if (this.#displaying == e_chart_type.system) {
       await this.#set_location_if_not_busy(
         e_location_type.system,
         this.#current_system.system.symbol,
@@ -1238,25 +1255,6 @@ export class StarChart {
       );
     }
   }
-}
-
-/**
- * @param box
- *        A `DOMRect`, typically one returned by `Element.getBoundingClientRect()`.
- * @param x
- *        The x coordinate of the point to check.
- * @param y
- *        The y coordinate of the point to check.
- * @returns
- *        `true` if (`x`, `y`) lies within `box`, else `false`.
- */
-function bound_box_contains(box, x, y) {
-  if (box.width == 0 || box.height == 0) {
-    // Even if the mouse is directly over the box location, never consider anything to be within a
-    // zero-sized box.
-    return false;
-  }
-  return box.top <= y && box.bottom >= y && box.left <= x && box.right >= x;
 }
 
 /**
