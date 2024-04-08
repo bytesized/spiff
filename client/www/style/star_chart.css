@@ -142,10 +142,18 @@
   width: 100%;
 }
 
-.star_chart .tooltip h1 {
+.star_chart .tooltip > h1,
+.star_chart .tooltip > h2 {
   margin-top: 0.2rem;
-  margin-left: 1rem;
   margin-bottom: 0.5rem;
+}
+
+.star_chart .tooltip > h1 {
+  margin-left: 1rem;
+}
+
+.star_chart .tooltip > h2 {
+  margin-left: 1.5rem;
 }
 
 .star_chart .tooltip li {

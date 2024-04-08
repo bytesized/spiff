@@ -1,5 +1,4 @@
 import * as m_busy_spinner from "./busy_spinner.mjs";
-import * as m_fn_queue from "./fn_queue.mjs";
 import * as m_list from "./list.mjs";
 import * as m_log from "./log.mjs";
 import * as m_popup from "./popup.mjs";
@@ -81,8 +80,14 @@ const k_system_edge_buffer_px = 25;
 const k_system_min_pixels_per_coord = 0.08;
 const k_system_zoom_multiplier = 0.001;
 const k_tooltip_width_px = 400;
+const k_universe_default_pixels_per_coordinate = 0.1;
+const k_universe_min_pixels_per_coordinate = 0.01;
+
+const k_system_border_base_width = 0.6;
+const k_system_image_base_size = 120;
+const k_system_padding_base_width = 9;
 const k_waypoint_border_base_width = 0.2;
-const k_waypoint_image_base_size = 20;
+const k_waypoint_image_base_size = 40;
 const k_waypoint_padding_base_width = 3;
 
 /**
@@ -106,9 +111,8 @@ export class StarChart {
   // Will be a value of `e_chart_type` once something is showing.
   #displaying = null;
 
-  // If non-`null`, matches the `result` format of the `server/star_chart/local_systems` local API
-  // endpoint.
-  #local_universe = null; // TODO
+  // Lazily loaded instance of `UniverseDataLoader`.
+  #universe_data_loader = null;
   // If non-`null`, matches the `result` format of the `server/star_chart/waypoints` and
   // `server/star_chart/sibling_waypoints` local API endpoints.
   #current_system = null;
@@ -198,7 +202,7 @@ export class StarChart {
   //  2. While the chart is loading, `set_location` is called from some external code.
   //  3. The two asynchronous operations race. The ultimate state of the chart depends on the
   //     outcome of this race. Potentially the chart jitters in an unexpected manner.
-  #location_change_queue = new m_fn_queue.Queue("star_chart_location_change_queue");
+  #location_change_queue = new m_utils.FunctionQueue("star_chart_location_change_queue");
 
   // These will be set to none except while a pan is in-progress.
   #x_pan = e_pan_direction.none;
@@ -388,6 +392,9 @@ export class StarChart {
     } else {
       this.#auth_token = null;
     }
+    if (this.#universe_data_loader) {
+      this.#universe_data_loader.auth_token = this.#auth_token;
+    }
   }
 
   get element() {
@@ -483,9 +490,6 @@ export class StarChart {
                            response.error_message);
             this.#universe_bounds = response.result;
           }
-
-          // TODO: Load and render universe data
-          throw new Error("Not yet implemented");
         }
       } else { // type == e_location_type.waypoint
         if (!this.#current_system || !(symbol in this.#current_system.waypoints)) {
@@ -660,7 +664,11 @@ export class StarChart {
     this.#reset_chart_el();
     this.#loaded_locations = {};
 
-    if (this.#displaying != e_chart_type.universe) {
+    if (this.#displaying == e_chart_type.universe) {
+      if (!this.#universe_data_loader) {
+        this.#universe_data_loader = new UniverseDataLoader(this.#auth_token);
+      }
+    } else {
       const back_button_background = m_utils.create_el("div", {
         parent: this.#overlay_layer_el,
         classes: [k_back_button_background_class_name],
@@ -741,18 +749,18 @@ export class StarChart {
    *        unspecified, it will be as if the cursor is in the center of the map.
    */
   #chart_rerender(reason, {zoom_by, zoom_center_x, zoom_center_y} = {}) {
+    if (reason != e_rerender_reason.initial_render && this.loading) {
+      return;
+    }
+
     const chart_bound_box = this.#chart_el.getBoundingClientRect();
 
-    // Past this point, we want to be able to assume that the size of the display is not 0 and the
-    // number of things we are going to display in it is not 0.
-    if (chart_bound_box.width == 0 || chart_bound_box.height == 0 ||
-        m_utils.object_is_empty(this.#loaded_locations)) {
+    const display_nothing = () => {
       this.#display_layer_el.replaceChildren();
       for (const symbol in this.#loaded_locations) {
         this.#loaded_locations[symbol].rendered = false;
       }
-      return;
-    }
+    };
 
     if (this.#displaying == e_chart_type.orbitals) {
       // When viewing the orbitals of a waypoint, they all have the same coordinates. So defining
@@ -763,9 +771,20 @@ export class StarChart {
       this.#max_y = null;
     }
 
+    // Nothing to render. The chart probably hasn't actually been displayed yet.
+    if (chart_bound_box.width == 0 || chart_bound_box.height == 0) {
+      display_nothing();
+      return;
+    }
+
     const resize_to_fit = this.#displaying == e_chart_type.system &&
       (reason == e_rerender_reason.chart_resize || this.#min_x == null);
     if (resize_to_fit) {
+      // The reduce functions below won't really work properly if there is nothing to display
+      if (m_utils.object_is_empty(this.#loaded_locations)) {
+        display_nothing();
+        return;
+      }
       // We are going to initially display the system to fit the chart.
       this.#min_x = m_utils.object_reduce(
         this.#loaded_locations,
@@ -795,9 +814,68 @@ export class StarChart {
     let pixels_per_coord;
     if (this.#displaying == e_chart_type.orbitals) {
       pixels_per_coord = k_orbital_view_pixels_per_coordinate;
+    } else if (this.#displaying == e_chart_type.universe && this.#min_x == null) {
+      pixels_per_coord = k_universe_default_pixels_per_coordinate;
+
+      x_span = chart_bound_box.width / pixels_per_coord;
+      y_span = chart_bound_box.height / pixels_per_coord;
+
+      const half_x_span = x_span / 2;
+      this.#min_x = this.#current_system.system.position.x - half_x_span;
+      this.#max_x = this.#current_system.system.position.x + half_x_span;
+      const half_y_span = y_span / 2;
+      this.#min_y = this.#current_system.system.position.y - half_y_span;
+      this.#max_y = this.#current_system.system.position.y + half_y_span;
+    } else if (this.#displaying == e_chart_type.universe &&
+               reason == e_rerender_reason.chart_resize) {
+      // Fix the aspect ratio
+      pixels_per_coord = chart_bound_box.width / x_span;
+      const center_y = (y_span / 2) + this.#min_y;
+      y_span = chart_bound_box.height / pixels_per_coord;
+      const y_edge_offset = y_span / 2;
+      this.#min_y = center_y - y_edge_offset;
+      this.#max_y = center_y + y_edge_offset;
     } else {
       pixels_per_coord = Math.min(chart_bound_box.width / x_span, chart_bound_box.height / y_span);
     }
+
+    if (this.#displaying == e_chart_type.universe) {
+      this.#universe_data_loader.set_bounds(this.#min_x, this.#max_x, this.#min_y, this.#max_y);
+      if (this.#universe_data_loader.data_is_ready) {
+        // Synchronize `this.#loaded_locations` with `this.#universe_data_loader.data`.
+        for (const location of Object.values(this.#loaded_locations)) {
+          if (!this.#universe_data_loader.is_within_loading_bounds(location.position)) {
+            delete this.#loaded_locations[location.symbol];
+          }
+        }
+        for (const symbol in this.#universe_data_loader.data) {
+          if (!(symbol in this.#loaded_locations)) {
+            this.#loaded_locations[symbol] = {
+              symbol,
+              position: {
+                x: this.#universe_data_loader.data[symbol].position.x,
+                y: this.#universe_data_loader.data[symbol].position.y,
+              },
+              rendered: false,
+            };
+          }
+        }
+      } else {
+        const original_arguments = arguments;
+        this.#location_change_queue.push(async () => {
+          await this.#universe_data_loader.until_data_ready();
+          this.#chart_rerender(...original_arguments);
+        });
+        return;
+      }
+    }
+
+    const location_image_base_size = this.#displaying == e_chart_type.universe ?
+                                     k_system_image_base_size : k_waypoint_image_base_size;
+    const location_border_base_width = this.#displaying == e_chart_type.universe ?
+                                       k_system_border_base_width : k_waypoint_border_base_width;
+    const location_padding_base_width = this.#displaying == e_chart_type.universe ?
+      k_system_padding_base_width : k_waypoint_padding_base_width;
 
     let location_content_size;
     let location_padding_width;
@@ -805,9 +883,9 @@ export class StarChart {
     let location_total_size;
     let location_total_size_halved;
     const update_location_size = () => {
-      location_content_size = k_waypoint_image_base_size * pixels_per_coord;
-      location_padding_width = k_waypoint_padding_base_width * pixels_per_coord;
-      location_border_width = k_waypoint_border_base_width * pixels_per_coord;
+      location_content_size = location_image_base_size * pixels_per_coord;
+      location_padding_width = location_padding_base_width * pixels_per_coord;
+      location_border_width = location_border_base_width * pixels_per_coord;
       location_total_size =
         location_content_size + (location_padding_width * 2) + (location_border_width * 2);
       location_total_size_halved = location_total_size / 2;
@@ -850,10 +928,11 @@ export class StarChart {
         this.#max_x = center_x + x_edge_offset;
       }
     } else if (reason == e_rerender_reason.zoom) {
-      pixels_per_coord = Math.max(
-        pixels_per_coord * (1 + (zoom_by * k_system_zoom_multiplier)),
-        k_system_min_pixels_per_coord
-      );
+      const min = this.#displaying == e_chart_type.universe
+                ? k_universe_min_pixels_per_coordinate
+                : k_system_min_pixels_per_coord;
+      pixels_per_coord =
+        Math.max(pixels_per_coord * (1 + (zoom_by * k_system_zoom_multiplier)), min);
 
       const new_x_span = chart_bound_box.width / pixels_per_coord;
       const new_y_span = chart_bound_box.height / pixels_per_coord;
@@ -936,6 +1015,15 @@ export class StarChart {
       }
     }
 
+    if (this.#displaying == e_chart_type.universe) {
+      // With the universe, we need to check the bounds rather than checking what systems are or
+      // aren't rendered since there are more systems that aren't currently loaded.
+      left_overflow = this.#min_x > this.#universe_bounds.min_x;
+      right_overflow = this.#max_x < this.#universe_bounds.max_x;
+      upper_overflow = this.#max_y < this.#universe_bounds.max_y;
+      lower_overflow = this.#min_y > this.#universe_bounds.min_y;
+    }
+
     update_location_size();
     let display_x;
     let display_y;
@@ -975,7 +1063,13 @@ export class StarChart {
     }
 
     for (const location of to_render) {
-      const waypoint = this.#current_system.waypoints[location.symbol];
+      let waypoint;
+      let system;
+      if (this.#displaying == e_chart_type.universe) {
+        system = this.#universe_data_loader.data[location.symbol];
+      } else {
+        waypoint = this.#current_system.waypoints[location.symbol];
+      }
 
       if (!location.el) {
         location.el = m_utils.create_el("div", {classes: [k_location_class_name]});
@@ -983,52 +1077,70 @@ export class StarChart {
         location.icon_el =
           m_utils.create_el("div", {parent: location.el, classes: [k_location_icon_class_name]});
         location.icon_el.setAttribute(k_location_symbol_attr, location.symbol);
-        location.icon_el.style["background-image"] =
-          "url(\"/client/img/star_chart/waypoint/fallback.svg\")";
+        if (this.#displaying == e_chart_type.universe) {
+          location.icon_el.style["background-image"] =
+            "url(\"/client/img/star_chart/waypoint/fallback.svg\")";
+        } else {
+          location.icon_el.style["background-image"] =
+            "url(\"/client/img/star_chart/system/fallback.svg\")";
+        }
         location.icon_el.style.padding = `${location_padding_width}px`;
         location.icon_el.style["border-width"] = `${location_border_width}px`;
 
+        location.tooltip_el = m_utils.create_el("div", {classes: [k_tooltip_class_name]});
         // TODO: Add line to tooltip if this is the headquarters.
         // TODO: Add ship count to tooltip.
+        if (this.#displaying != e_chart_type.universe) {
 
-        location.tooltip_el = m_utils.create_el("div", {classes: [k_tooltip_class_name]});
-        m_utils.create_el("h1", {parent: location.tooltip_el, text: waypoint.symbol});
-        const tooltip_list_el = m_utils.create_el("ul", {
-          parent: location.tooltip_el,
-          classes: [k_tooltip_data_list_class_name],
-        });
-        m_utils.create_el("li", {
-          parent: tooltip_list_el,
-          text: `Location: ${waypoint.position.x}, ${waypoint.position.y}`,
-        });
-        if (waypoint.orbits != null) {
-          m_utils.create_el("li", {parent: tooltip_list_el, text: `Orbits: ${waypoint.orbits}`});
-        }
-        m_utils.create_el("li", {parent: tooltip_list_el, text: `Type: ${waypoint.type.symbol}`});
-        const traits_li = m_utils.create_el("li", {parent: tooltip_list_el});
-        m_utils.create_el("h2", {parent: traits_li, text: "Traits"});
-        const traits = [];
-        for (const trait of waypoint.traits) {
-          const description_el = m_utils.create_el("p", {
-            text: trait.description,
-            classes: [k_tooltip_trait_description_class_name],
+          m_utils.create_el("h1", {parent: location.tooltip_el, text: waypoint.symbol});
+          const tooltip_list_el = m_utils.create_el("ul", {
+            parent: location.tooltip_el,
+            classes: [k_tooltip_data_list_class_name],
           });
-          traits.push([trait.name, trait.name, description_el]);
-        }
-        const trait_click_handler = ({list, item, id}) => {
-          item.classList.toggle(k_tooltip_expanded_trait_class_name);
-          this.#position_size_and_show_tooltip(waypoint.symbol);
-        };
-        const trait_list = m_list.create_selectable(traits, trait_click_handler);
-        traits_li.append(trait_list);
-        if (waypoint.orbitals.length) {
-          const orbitals_li = m_utils.create_el("li", {parent: tooltip_list_el});
-          m_utils.create_el("h2", {parent: orbitals_li, text: "Orbitals"});
-          const orbitals_list = m_utils.create_el("ul", {parent: orbitals_li});
-          for (const orbital of waypoint.orbitals) {
-            m_utils.create_el("li", {parent: orbitals_list, text: orbital});
+          m_utils.create_el("li", {
+            parent: tooltip_list_el,
+            text: `Location: ${waypoint.position.x}, ${waypoint.position.y}`,
+          });
+          if (waypoint.orbits != null) {
+            m_utils.create_el("li", {parent: tooltip_list_el, text: `Orbits: ${waypoint.orbits}`});
           }
+          m_utils.create_el("li", {
+            parent: tooltip_list_el,
+            text: `Type: ${waypoint.type.symbol}`
+          });
+          const traits_li = m_utils.create_el("li", {parent: tooltip_list_el});
+          m_utils.create_el("h2", {parent: traits_li, text: "Traits"});
+          const traits = [];
+          for (const trait of waypoint.traits) {
+            const description_el = m_utils.create_el("p", {
+              text: trait.description,
+              classes: [k_tooltip_trait_description_class_name],
+            });
+            traits.push([trait.name, trait.name, description_el]);
+          }
+          const trait_click_handler = ({list, item, id}) => {
+            item.classList.toggle(k_tooltip_expanded_trait_class_name);
+            this.#position_size_and_show_tooltip(waypoint.symbol);
+          };
+          const trait_list = m_list.create_selectable(traits, trait_click_handler);
+          traits_li.append(trait_list);
+          if (waypoint.orbitals.length) {
+            const orbitals_li = m_utils.create_el("li", {parent: tooltip_list_el});
+            m_utils.create_el("h2", {parent: orbitals_li, text: "Orbitals"});
+            const orbitals_list = m_utils.create_el("ul", {parent: orbitals_li});
+            for (const orbital of waypoint.orbitals) {
+              m_utils.create_el("li", {parent: orbitals_list, text: orbital});
+            }
+          }
+
+          if (waypoint.orbitals.length) {
+            location.el.classList.add(k_orbited_location_class_name);
+          }
+        } else {
+          m_utils.create_el("h1", {parent: location.tooltip_el, text: system.symbol});
+          m_utils.create_el("h2", {parent: location.tooltip_el, text: system.type.symbol});
         }
+
         location.tooltip_el.addEventListener("click", event => {
           event.stopPropagation();
         });
@@ -1042,7 +1154,10 @@ export class StarChart {
         };
 
         location.el.addEventListener("click", async () => {
-          if (this.#displaying == e_chart_type.system && waypoint.orbitals.length) {
+          if (this.#displaying == e_chart_type.universe) {
+            await this.#set_location_if_not_busy(e_location_type.system, system.symbol,
+                                                 e_location_view_type.zoomed_in_to);
+          } else if (this.#displaying == e_chart_type.system && waypoint.orbitals.length) {
             await this.#set_location_if_not_busy(e_location_type.waypoint, waypoint.symbol,
                                                  e_location_view_type.zoomed_in_to);
           } else if (this.#selection_type == e_selection_type.waypoint) {
@@ -1052,14 +1167,11 @@ export class StarChart {
             });
           }
         });
-
-        if (waypoint.orbitals.length) {
-          location.el.classList.add(k_orbited_location_class_name);
-        }
       }
 
       if (this.#selection_type == e_selection_type.waypoint ||
-          (waypoint.orbitals.length && this.#displaying != e_chart_type.orbitals)) {
+          this.#displaying != e_chart_type.universe ||
+          (this.#displaying == e_chart_type.system && waypoint.orbitals.length)) {
         location.el.classList.add(k_clickable_location_class_name);
       } else {
         location.el.classList.remove(k_clickable_location_class_name);
@@ -1254,6 +1366,148 @@ export class StarChart {
         e_location_view_type.centered_on
       );
     }
+  }
+}
+
+/**
+ * This is a helper class that loads universe data and makes it available to `StarChart`.
+ *
+ * `UniverseDataLoader` loads more than the area needed to help avoid the chart needing to show a
+ * loading spinner for every little pan/zoom.
+ */
+class UniverseDataLoader {
+  #auth_token;
+
+  // Format of all of these will be an object with properties: `min_x`, `max_x`, `min_y`, `max_y`.
+  #bounds = null;
+  #load_area = null;
+  #loaded_area = null;
+
+  #data;
+
+  // Will hold an instance of `m_utils.SmartPromise` that resolves when the current map data
+  // transfer completes.
+  #transfer_promise;
+
+  constructor(auth_token) {
+    this.#auth_token = auth_token;
+    this.#transfer_promise = new m_utils.SmartPromise({
+      on_resolve: value => {
+        this.#data = value;
+        this.#loaded_area = this.#load_area;
+      },
+    });
+  }
+
+  get auth_token() {
+    return this.#auth_token
+  }
+
+  /**
+   * Note that changing the auth_token will affect future map data requests only. Any requests that
+   * are already in progress or completed will not be affected, nor will that data be automatically
+   * reloaded.
+   *
+   * Currently, it is my understanding that map data is the same across agents, so changing from
+   * one valid authentication token to another should have no effect.
+   */
+  set auth_token(new_auth_token) {
+    if (new_auth_token) {
+      this.#auth_token = new_auth_token;
+    } else {
+      this.#auth_token = null;
+    }
+  }
+
+  /**
+   * Sets the bounds that are currently being displayed. This will be expanded to set the loading
+   * area.
+   */
+  set_bounds(min_x, max_x, min_y, max_y) {
+    this.#bounds = {min_x, max_x, min_y, max_y};
+    const x_span = max_x - min_x;
+    const y_span = max_y - min_y;
+    const new_load_area = {
+      min_x: min_x - x_span,
+      max_x: max_x + x_span,
+      min_y: min_y - y_span,
+      max_y: max_y + y_span,
+    };
+    if (this.#load_area && this.#load_area.min_x <= new_load_area.min_x &&
+        this.#load_area.max_x >= new_load_area.max_x &&
+        this.#load_area.min_y <= new_load_area.min_y &&
+        this.#load_area.max_y >= new_load_area.max_y) {
+      // We have already loaded a superset of this so we are done.
+      return;
+    }
+    this.#load_area = new_load_area;
+
+    this.#transfer_promise.reset({
+      promise: (async () => {
+        const response = await m_server.star_chart.local_systems(
+          this.#load_area.min_x, this.#load_area.max_x, this.#load_area.min_y,
+          this.#load_area.max_y
+        );
+        k_log.raise_if(!response.success, "Failed to get local universe data from server:",
+                       response.error_message);
+        return response.result;
+      })(),
+    });
+  }
+
+  /**
+   * Checks whether the specified coordinates are within the bounds that the data loader is
+   * currently set to load. Note that this is different from the bounds given to the last call to
+   * `set_bounds()`, which pads the area as described in the in the `UniverseDataLoader`
+   * documentation comment.
+   *
+   * @param position
+   *        An object with `x` and `y` keys describing the position to check.
+   * @returns
+   *        `true` if the position is in the loading area, else `false`.
+   */
+  is_within_loading_bounds(position) {
+    return (
+      this.#load_area &&
+      this.#load_area.min_x <= position.x &&
+      this.#load_area.max_x >= position.x &&
+      this.#load_area.min_y <= position.y &&
+      this.#load_area.max_y >= position.y
+    );
+  }
+
+  /**
+   * @returns
+   *        `true` if `this.data` is ready.
+   */
+  get data_is_ready() {
+    return (
+      this.#loaded_area &&
+      this.#bounds.min_x >= this.#loaded_area.min_x &&
+      this.#bounds.max_x <= this.#loaded_area.max_x &&
+      this.#bounds.min_y >= this.#loaded_area.min_y &&
+      this.#bounds.max_y <= this.#loaded_area.max_y
+    );
+  }
+
+  /**
+   * Waits until `this.data` is ready, then returns `this.data`.
+   */
+  async until_data_ready() {
+    while (this.#transfer_promise.status == m_utils.e_promise_status.unresolved) {
+      await this.#transfer_promise.until_complete();
+    }
+    return this.data;
+  }
+
+  /**
+   * This will match the format of the `result` object from the `server/star_chart/local_systems`
+   * local API endpoint.
+   *
+   * Only valid if `this.data_is_ready`.
+   */
+  get data() {
+    return this.#data;
   }
 }
 

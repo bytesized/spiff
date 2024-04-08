@@ -74,7 +74,7 @@ export class Logger {
 
   raise(...message) {
     this.error(...message)
-    throw new Error(prefix + message.join(" "));
+    throw new Error(this.prefix + message.join(" "));
   }
 
   raise_if(condition, ...message) {
